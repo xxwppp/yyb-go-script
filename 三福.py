@@ -66,6 +66,23 @@ except Exception: pass
 
 __atexit.register(__push)
 # === YYB_GO 统一通知注入 end ===
+# === YYB 微信备注映射注入 begin ===
+import os as _os_nm
+_NAME_MAP = {}
+_raw_nm = _os_nm.environ.get("YYB_NAME_MAP", "") or ""
+for _line_nm in _raw_nm.replace("&", "\n").splitlines():
+    _line_nm = _line_nm.strip()
+    if "=" in _line_nm:
+        _k_nm, _v_nm = _line_nm.split("=", 1)
+        _NAME_MAP[_k_nm.strip()] = _v_nm.strip()
+
+def yyb_display(entry):
+    if not entry:
+        return entry
+    _ref = entry.split("@", 1)[1] if "@" in entry else entry
+    return _NAME_MAP.get(_ref, entry)
+# === YYB 微信备注映射注入 end ===
+
 
 # name: 三福
 # cron: 0 40 8 * * *
@@ -125,7 +142,7 @@ if len(SERVERS) == 0:
 
 print(f"✅ 成功读取 {len(SERVERS)} 台内网服务器：")
 for item in SERVERS:
-    print(f" - {item}")
+    print(f" - {yyb_display(item)}")
 print("-" * 50)
 
 PROXY_API = os.getenv("PROXY_API", "")
@@ -227,9 +244,9 @@ def validateProxy(proxies):
 
 async def getValidProxy(accountName):
     if not PROXY_API:
-        print(f"ℹ️ [{accountName}] 未配置代理API，使用直连")
+        print(f"ℹ️ [{yyb_display(accountName)}] 未配置代理API，使用直连")
         return None
-    print(f"🔌 [{accountName}] 正在从品赞API获取专属代理 ({PROXY_TYPE})...")
+    print(f"🔌 [{yyb_display(accountName)}] 正在从品赞API获取专属代理 ({PROXY_TYPE})...")
     
     for i in range(PROXY_RETRY_TIMES):
         try:
@@ -237,21 +254,21 @@ async def getValidProxy(accountName):
             proxyInfo = parseProxyResponse(res.text)
             
             if not proxyInfo:
-                print(f"⚠️ [{accountName}] 第{i+1}次获取代理失败：响应格式无法解析")
+                print(f"⚠️ [{yyb_display(accountName)}] 第{i+1}次获取代理失败：响应格式无法解析")
                 continue
-            print(f"✅ [{accountName}] 提取到专属代理：{proxyInfo['host']}:{proxyInfo['port']}")
+            print(f"✅ [{yyb_display(accountName)}] 提取到专属代理：{proxyInfo['host']}:{proxyInfo['port']}")
             
             proxies = buildProxyDict(proxyInfo)
             if validateProxy(proxies):
                 return proxies
             else:
-                print(f"⚠️ [{accountName}] 第{i+1}次获取的代理不可用，正在重试...")
+                print(f"⚠️ [{yyb_display(accountName)}] 第{i+1}次获取的代理不可用，正在重试...")
         except Exception as e:
-            print(f"⚠️ [{accountName}] 第{i+1}次获取代理异常：{str(e)[:60]}")
+            print(f"⚠️ [{yyb_display(accountName)}] 第{i+1}次获取代理异常：{str(e)[:60]}")
         
         if i < PROXY_RETRY_TIMES - 1:
             await sleep(2000)
-    print(f"❌ [{accountName}] 连续多次获取代理失败，使用直连")
+    print(f"❌ [{yyb_display(accountName)}] 连续多次获取代理失败，使用直连")
     return None
 
 # ===================== PushPlus通知 =====================
@@ -305,7 +322,7 @@ def getCode(server):
 
     url = f"https://{parsed_server}/wxapp/getCode"
     payload = {"ref": ref, "app_id": APPID}
-    print(f"[{parsed_server}] 请求YYB Go获取code：{url}")
+    print(f"[{yyb_display(server)}] 请求YYB Go获取code：{url}")
 
     try:
         res = requests.post(
@@ -317,13 +334,13 @@ def getCode(server):
         data = res.json()
         code = (((data.get("data") or {}).get("result") or {}).get("code"))
         if data.get("code") != 0 or not code:
-            print(f"[{parsed_server}] 获取code失败：{data}")
+            print(f"[{yyb_display(server)}] 获取code失败：{data}")
             return None
 
-        print(f"[{parsed_server}] 获取code成功")
+        print(f"[{yyb_display(server)}] 获取code成功")
         return code
     except Exception as exc:
-        print(f"[{parsed_server}] 获取code异常：{exc}")
+        print(f"[{yyb_display(server)}] 获取code异常：{exc}")
         return None
 
 def wxLogin(jsCode, UA, proxies, server):
@@ -348,19 +365,19 @@ def wxLogin(jsCode, UA, proxies, server):
     try:
         response = None
         if proxies:
-            print(f"🌐 [{server}] 正在使用专属代理发起登录请求...")
+            print(f"🌐 [{yyb_display(server)}] 正在使用专属代理发起登录请求...")
             try:
                 response = requests.post(login_url, json=payload, headers=headers, proxies=proxies, timeout=20)
             except Exception as e:
-                print(f"⚠️ [{server}] 代理登录失败，切换直连重试...")
+                print(f"⚠️ [{yyb_display(server)}] 代理登录失败，切换直连重试...")
                 response = requests.post(login_url, json=payload, headers=headers, proxies={}, timeout=20)
         else:
             response = requests.post(login_url, json=payload, headers=headers, proxies={}, timeout=20)
         
-        print(f"[{server}] 登录接口返回：{response.text[:300]}")
+        print(f"[{yyb_display(server)}] 登录接口返回：{response.text[:300]}")
         return response.json()
     except Exception as e:
-        print(f"❌ [{server}] 登录异常: {str(e)[:60]}")
+        print(f"❌ [{yyb_display(server)}] 登录异常: {str(e)[:60]}")
         return None
 
 # 核心修复：改用sid鉴权，删除无效token头
@@ -386,7 +403,7 @@ def commonRequest(url, method="GET", body=None, sid="", UA="", proxies=None, ser
                 else:
                     response = requests.get(req_url, params=body, headers=headers, proxies=proxies, timeout=20)
             except Exception as e:
-                print(f"⚠️ [{server}] 代理请求失败，切换直连重试...")
+                print(f"⚠️ [{yyb_display(server)}] 代理请求失败，切换直连重试...")
                 if method.upper() == "POST":
                     response = requests.post(req_url, json=body, headers=headers, proxies={}, timeout=20)
                 else:
@@ -398,7 +415,7 @@ def commonRequest(url, method="GET", body=None, sid="", UA="", proxies=None, ser
                 response = requests.get(req_url, params=body, headers=headers, proxies={}, timeout=20)
         return response.json()
     except Exception as e:
-        print(f"❌ [{server}] 请求异常: {str(e)[:60]}")
+        print(f"❌ [{yyb_display(server)}] 请求异常: {str(e)[:60]}")
         return None
 
 # ===================== 单个账号执行 =====================
@@ -411,7 +428,7 @@ async def runAccount(server, globalProxyAgent):
         "error": "",
         "proxyStatus": "未使用代理"
     }
-    print(f"\n===== 三福 - {server} 账号 =====")
+    print(f"\n===== 三福 - {yyb_display(server)} 账号 =====")
     UA = getUA()
     proxyAgent = globalProxyAgent
     if ENABLE_PER_ACCOUNT_PROXY:
@@ -421,28 +438,28 @@ async def runAccount(server, globalProxyAgent):
     
     try:
         startDelay = random_int(2000, 6000)
-        print(f"⏳ [{server}] 启动延迟 {startDelay / 1000}s")
+        print(f"⏳ [{yyb_display(server)}] 启动延迟 {startDelay / 1000}s")
         await sleep(startDelay)
         
         # 1. 获取code
         code = getCode(server)
         if not code:
             result["error"] = "获取code失败"
-            print(f"❌ [{server}] 获取code失败")
+            print(f"❌ [{yyb_display(server)}] 获取code失败")
             return result
         
         # 2. 登录获取sid
         login_data = wxLogin(code, UA, proxyAgent, server)
         if not login_data or login_data.get("code") != 200:
             result["error"] = login_data.get("msg", "登录失败") if login_data else "登录无响应"
-            print(f"❌ [{server}] 登录失败：{result['error']}")
+            print(f"❌ [{yyb_display(server)}] 登录失败：{result['error']}")
             return result
         sid = login_data["data"].get("sid", "")
         if not sid:
             result["error"] = "未获取到sid，无法继续"
-            print(f"❌ [{server}] 未获取到sid，无法继续")
+            print(f"❌ [{yyb_display(server)}] 未获取到sid，无法继续")
             return result
-        print(f"✅ [{server}] 登录成功获取sid")
+        print(f"✅ [{yyb_display(server)}] 登录成功获取sid")
         await sleep(random_int(3000, 8000))
         
         # 3. 每日签到
@@ -459,11 +476,11 @@ async def runAccount(server, globalProxyAgent):
             fubi = sign_data["data"].get("fubi", 0)
             keep_day = sign_data["data"].get("onKeepSignDay", 0)
             result["signMsg"] = f"签到成功！连续签到{keep_day}天，获得{fubi}福币"
-            print(f"✅ [{server}] {result['signMsg']}")
+            print(f"✅ [{yyb_display(server)}] {result['signMsg']}")
         else:
             msg = sign_data.get("msg", "未知错误") if sign_data else "接口无响应"
             result["signMsg"] = f"签到失败：{msg}"
-            print(f"❌ [{server}] {result['signMsg']}")
+            print(f"❌ [{yyb_display(server)}] {result['signMsg']}")
         await sleep(random_int(2000, 5000))
         
         # 4. 查询福币
@@ -479,13 +496,13 @@ async def runAccount(server, globalProxyAgent):
         if info_data and info_data.get("code") == 200:
             cur_fubi = info_data["data"].get("fubi", 0)
             result["scoreMsg"] = f"当前账号总福币：{cur_fubi}个"
-            print(f"🎯 [{server}] {result['scoreMsg']}")
+            print(f"🎯 [{yyb_display(server)}] {result['scoreMsg']}")
         
         result["success"] = True
-        print(f"✅ [{server}] 账号执行完成")
+        print(f"✅ [{yyb_display(server)}] 账号执行完成")
     except Exception as e:
         result["error"] = str(e)
-        print(f"❌ [{server}] 执行异常：{str(e)[:60]}")
+        print(f"❌ [{yyb_display(server)}] 执行异常：{str(e)[:60]}")
     return result
 
 # ===================== 主程序 =====================

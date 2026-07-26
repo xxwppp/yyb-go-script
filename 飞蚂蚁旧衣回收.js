@@ -65,6 +65,21 @@
   process.on('beforeExit', () => { if (!__exiting) { __exiting = true; try { __flush(); } catch (e) {} } });
 })();
 // === YYB_GO 统一通知注入 end ===
+// === YYB 微信备注映射注入 begin ===
+const _NAME_MAP = {};
+const _raw_nm = process.env.YYB_NAME_MAP || "";
+_raw_nm.split(/[\n&]/).forEach(function (line) {
+  line = line.trim();
+  const idx = line.indexOf("=");
+  if (idx > 0) _NAME_MAP[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+});
+function yybDisplay(entry) {
+  if (!entry) return entry;
+  const ref = entry.indexOf("@") !== -1 ? entry.slice(entry.indexOf("@") + 1) : entry;
+  return _NAME_MAP[ref] !== undefined ? _NAME_MAP[ref] : entry;
+}
+// === YYB 微信备注映射注入 end ===
+
 
 // name: 飞蚂蚁旧衣回收
 // cron: 0 0 14 * * *
@@ -123,7 +138,7 @@ if (SERVERS.length === 0) {
     process.exit(1);
 }
 console.log(`✅ 成功读取 ${SERVERS.length} 台内网wxcode服务：`);
-SERVERS.forEach(item => console.log(` - ${item}`));
+SERVERS.forEach(item => console.log(` - ${yybDisplay(item)}`));
 console.log("----------------------------------------\n");
 
 // 品赞代理配置（青龙环境变量）
@@ -423,11 +438,11 @@ async function wxLogin(jsCode, UA, proxyAgent, server) {
     try {
         let response = null;
         if (proxyAgent) {
-            console.log(`🌐 [${server}] 正在使用专属代理发起登录请求...`);
+            console.log(`🌐 [{yybDisplay(server)}] 正在使用专属代理发起登录请求...`);
             try {
                 response = await axios(addProxyToAxiosConfig(baseConfig, proxyAgent));
             } catch (e) {
-                console.log(`⚠️ [${server}] 代理登录失败，切换直连重试...`);
+                console.log(`⚠️ [{yybDisplay(server)}] 代理登录失败，切换直连重试...`);
                 response = await axios({ ...baseConfig, proxy: false });
             }
         } else {
@@ -437,7 +452,7 @@ async function wxLogin(jsCode, UA, proxyAgent, server) {
         debugLog("登录完整响应", response.data);
         return response.data;
     } catch (e) {
-        console.log(`❌ [${server}] 登录异常: ${e.message}`);
+        console.log(`❌ [{yybDisplay(server)}] 登录异常: ${e.message}`);
         if (e.response) {
             debugLog("登录错误响应", e.response.data);
         }
@@ -479,7 +494,7 @@ async function commonPost(url, body, token, UA, proxyAgent, server) {
             try {
                 response = await axios(addProxyToAxiosConfig(baseConfig, proxyAgent));
             } catch (e) {
-                console.log(`⚠️ [${server}] 代理请求失败，切换直连重试...`);
+                console.log(`⚠️ [{yybDisplay(server)}] 代理请求失败，切换直连重试...`);
                 response = await axios({ ...baseConfig, proxy: false });
             }
         } else {
@@ -489,7 +504,7 @@ async function commonPost(url, body, token, UA, proxyAgent, server) {
         debugLog(`业务请求${url}响应`, response.data);
         return response.data;
     } catch (e) {
-        console.log(`❌ [${server}] 请求异常: ${e.message}`);
+        console.log(`❌ [{yybDisplay(server)}] 请求异常: ${e.message}`);
         if (e.response) {
             debugLog(`业务请求${url}错误响应`, e.response.data);
         }
@@ -507,7 +522,7 @@ async function runAccount(server, globalProxyAgent) {
         error: "",
         proxyStatus: "未使用代理"
     };
-    console.log(`\n===== 飞蚂蚁旧衣回收 - ${server} 账号 =====`);
+    console.log(`\n===== 飞蚂蚁旧衣回收 - ${yybDisplay(server)} 账号 =====`);
     const UA = getUA();
     let proxyAgent = globalProxyAgent;
     if (ENABLE_PER_ACCOUNT_PROXY) {
@@ -517,7 +532,7 @@ async function runAccount(server, globalProxyAgent) {
     }
     try {
         let startDelay = random(2000, 6000);
-        console.log(`⏳ [${server}] 启动延迟 ${startDelay / 1000}s`);
+        console.log(`⏳ [{yybDisplay(server)}] 启动延迟 ${startDelay / 1000}s`);
         await sleep(startDelay);
 
         // 1️⃣ 获取code
@@ -531,13 +546,13 @@ async function runAccount(server, globalProxyAgent) {
         let login = await wxLogin(code, UA, proxyAgent, server);
         if (!login) {
             result.error = "登录请求无响应";
-            console.log(`❌ [${server}] 登录失败：无响应数据`);
+            console.log(`❌ [{yybDisplay(server)}] 登录失败：无响应数据`);
             return result;
         }
 
         if (login.code != 200) {
             result.error = `登录失败：${login.message || "未知错误"}`;
-            console.log(`❌ [${server}] ${result.error}`);
+            console.log(`❌ [{yybDisplay(server)}] ${result.error}`);
             return result;
         }
 
@@ -555,11 +570,11 @@ async function runAccount(server, globalProxyAgent) {
 
         if (!token) {
             result.error = "无法从登录响应中提取token，请查看调试日志";
-            console.log(`❌ [${server}] ${result.error}`);
+            console.log(`❌ [{yybDisplay(server)}] ${result.error}`);
             return result;
         }
 
-        console.log(`✅ [${server}] 登录成功，获取到有效token`);
+        console.log(`✅ [{yybDisplay(server)}] 登录成功，获取到有效token`);
         debugLog("提取到的token", token);
         await sleep(random(3000, 8000));
 
@@ -572,16 +587,16 @@ async function runAccount(server, globalProxyAgent) {
         }, token, UA, proxyAgent, server);
         if (sign?.code == 200) {
             result.signMsg = `签到成功：${sign.message}`;
-            console.log(`✅ [${server}] 签到成功：${sign.message}`);
+            console.log(`✅ [{yybDisplay(server)}] 签到成功：${sign.message}`);
         } else {
             result.signMsg = `签到失败：${sign?.message || "未知错误"}`;
-            console.log(`❌ [${server}] 签到失败：${sign?.message || "未知错误"}`);
+            console.log(`❌ [{yybDisplay(server)}] 签到失败：${sign?.message || "未知错误"}`);
         }
         await sleep(random(2000, 5000));
 
         // 4️⃣ 步数兑换（循环3次）
         for (let i = 0; i < 3; i++) {
-            console.log(`🚶 [${server}] 开始第${i+1}次步数兑换...`);
+            console.log(`🚶 [{yybDisplay(server)}] 开始第${i+1}次步数兑换...`);
             let exchange = await commonPost('/step/exchange', {
                 "steps": random(5000, 8000),
                 "version": APP_VERSION,
@@ -592,11 +607,11 @@ async function runAccount(server, globalProxyAgent) {
             if (exchange?.code == 200) {
                 let msg = `第${i+1}次步数兑换成功：${exchange.message}`;
                 result.exchangeMsgs.push(msg);
-                console.log(`✅ [${server}] ${msg}`);
+                console.log(`✅ [{yybDisplay(server)}] ${msg}`);
             } else {
                 let msg = `第${i+1}次步数兑换失败：${exchange?.message || "未知错误"}`;
                 result.exchangeMsgs.push(msg);
-                console.log(`❌ [${server}] ${msg}`);
+                console.log(`❌ [{yybDisplay(server)}] ${msg}`);
             }
             if (i < 2) {
                 await sleep(random(3000, 5000));
@@ -604,11 +619,11 @@ async function runAccount(server, globalProxyAgent) {
         }
 
         result.success = true;
-        console.log(`✅ [${server}] 账号执行完成`);
+        console.log(`✅ [{yybDisplay(server)}] 账号执行完成`);
     } catch (e) {
         result.error = `执行异常：${e.message}`;
-        console.log(`❌ [${server}] 执行异常：`, e.message);
-        console.log(`❌ [${server}] 异常堆栈：`, e.stack);
+        console.log(`❌ [{yybDisplay(server)}] 执行异常：`, e.message);
+        console.log(`❌ [{yybDisplay(server)}] 异常堆栈：`, e.stack);
     }
     return result;
 }

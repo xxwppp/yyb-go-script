@@ -65,6 +65,21 @@
   process.on('beforeExit', () => { if (!__exiting) { __exiting = true; try { __flush(); } catch (e) {} } });
 })();
 // === YYB_GO 统一通知注入 end ===
+// === YYB 微信备注映射注入 begin ===
+const _NAME_MAP = {};
+const _raw_nm = process.env.YYB_NAME_MAP || "";
+_raw_nm.split(/[\n&]/).forEach(function (line) {
+  line = line.trim();
+  const idx = line.indexOf("=");
+  if (idx > 0) _NAME_MAP[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+});
+function yybDisplay(entry) {
+  if (!entry) return entry;
+  const ref = entry.indexOf("@") !== -1 ? entry.slice(entry.indexOf("@") + 1) : entry;
+  return _NAME_MAP[ref] !== undefined ? _NAME_MAP[ref] : entry;
+}
+// === YYB 微信备注映射注入 end ===
+
 
 // name: 千金健康生活
 // cron: 37 8 * * *

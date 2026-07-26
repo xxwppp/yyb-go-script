@@ -65,6 +65,23 @@ except Exception: pass
 
 __atexit.register(__push)
 # === YYB_GO 统一通知注入 end ===
+# === YYB 微信备注映射注入 begin ===
+import os as _os_nm
+_NAME_MAP = {}
+_raw_nm = _os_nm.environ.get("YYB_NAME_MAP", "") or ""
+for _line_nm in _raw_nm.replace("&", "\n").splitlines():
+    _line_nm = _line_nm.strip()
+    if "=" in _line_nm:
+        _k_nm, _v_nm = _line_nm.split("=", 1)
+        _NAME_MAP[_k_nm.strip()] = _v_nm.strip()
+
+def yyb_display(entry):
+    if not entry:
+        return entry
+    _ref = entry.split("@", 1)[1] if "@" in entry else entry
+    return _NAME_MAP.get(_ref, entry)
+# === YYB 微信备注映射注入 end ===
+
 
 # name: 奈雪的茶
 # cron: 0 0 10 * * *
@@ -137,7 +154,7 @@ if len(SERVERS) == 0:
 
 print(f"✅ 成功读取 {len(SERVERS)} 台内网wxcode服务：")
 for item in SERVERS:
-    print(f" - {item}")
+    print(f" - {yyb_display(item)}")
 print("-" * 60 + "\n")
 
 PLUSPLUS_TOKEN = os.getenv("PLUSPLUS_TOKEN", "")
@@ -335,10 +352,10 @@ def validate_proxy(proxies: dict | None) -> bool:
 
 def get_valid_proxy(account_name: str) -> dict | None:
     if not PROXY_API:
-        print(f"[{account_name}] 未配置 PROXY_API，使用直连")
+        print(f"[{yyb_display(account_name)}] 未配置 PROXY_API，使用直连")
         return None
 
-    print(f"[{account_name}] 正在获取品赞代理...")
+    print(f"[{yyb_display(account_name)}] 正在获取品赞代理...")
 
     for index in range(1, PROXY_RETRY_TIMES + 1):
         try:
@@ -346,23 +363,23 @@ def get_valid_proxy(account_name: str) -> dict | None:
             proxy_info = parse_proxy_response(res.text)
 
             if not proxy_info:
-                print(f"[{account_name}] 第 {index} 次代理解析失败")
+                print(f"[{yyb_display(account_name)}] 第 {index} 次代理解析失败")
                 continue
 
-            print(f"[{account_name}] 提取到代理：{proxy_info['host']}:{proxy_info['port']}")
+            print(f"[{yyb_display(account_name)}] 提取到代理：{proxy_info['host']}:{proxy_info['port']}")
             proxies = build_proxy_dict(proxy_info)
 
             if validate_proxy(proxies):
                 return proxies
 
-            print(f"[{account_name}] 第 {index} 次代理不可用")
+            print(f"[{yyb_display(account_name)}] 第 {index} 次代理不可用")
         except Exception as exc:
-            print(f"[{account_name}] 第 {index} 次获取代理异常：{exc}")
+            print(f"[{yyb_display(account_name)}] 第 {index} 次获取代理异常：{exc}")
 
         if index < PROXY_RETRY_TIMES:
             sleep(2)
 
-    print(f"[{account_name}] 获取代理失败，使用直连")
+    print(f"[{yyb_display(account_name)}] 获取代理失败，使用直连")
     return None
 
 
@@ -397,10 +414,10 @@ def request_with_proxy(method: str, url: str, *, proxies: dict | None = None, se
         try:
             return requests.request(method, url, proxies=proxies, **kwargs)
         except Exception as exc:
-            print(f"[{server}] 代理请求失败：{exc}")
+            print(f"[{yyb_display(server)}] 代理请求失败：{exc}")
             if not ENABLE_DIRECT_FALLBACK:
                 raise
-            print(f"[{server}] 切换直连重试")
+            print(f"[{yyb_display(server)}] 切换直连重试")
 
     return requests.request(method, url, **kwargs)
 
@@ -437,7 +454,7 @@ def get_code(server: str) -> str | None:
         return None
 
     url = f"https://{parsed_server}/wxapp/getCode"
-    print(f"[{parsed_server}] 请求YYB Go获取code：{url}")
+    print(f"[{yyb_display(server)}] 请求YYB Go获取code：{url}")
 
     try:
         res = requests.post(
@@ -450,13 +467,13 @@ def get_code(server: str) -> str | None:
         code = (((data.get("data") or {}).get("result") or {}).get("code"))
 
         if data.get("code") != 0 or not code:
-            print(f"[{parsed_server}] 获取code失败：{data}")
+            print(f"[{yyb_display(server)}] 获取code失败：{data}")
             return None
 
-        print(f"[{parsed_server}] 获取code成功")
+        print(f"[{yyb_display(server)}] 获取code成功")
         return code
     except Exception as exc:
-        print(f"[{parsed_server}] 获取code异常：{exc}")
+        print(f"[{yyb_display(server)}] 获取code异常：{exc}")
         return None
 
 def extract_token(data) -> str | None:
@@ -548,13 +565,13 @@ def login_by_code(code: str, ua: str, proxies: dict | None, server: str) -> tupl
 
         token = extract_token(data)
         if token:
-            print(f"[{server}] 登录成功，已获取 token")
+            print(f"[{yyb_display(server)}] 登录成功，已获取 token")
             return token, data
 
-        print(f"[{server}] 登录成功但未识别 token 字段：{json.dumps(data, ensure_ascii=False)[:800]}")
+        print(f"[{yyb_display(server)}] 登录成功但未识别 token 字段：{json.dumps(data, ensure_ascii=False)[:800]}")
         return None, data
     except Exception as exc:
-        print(f"[{server}] 登录异常：{exc}")
+        print(f"[{yyb_display(server)}] 登录异常：{exc}")
         return None, None
 
 
@@ -599,7 +616,7 @@ def run_account(server: str, global_proxy: dict | None = None) -> dict:
         "error": "",
     }
 
-    print(f"\n===== 奈雪点单 - {server} 账号 =====")
+    print(f"\n===== 奈雪点单 - {yyb_display(server)} 账号 =====")
     ua = get_ua()
 
     proxies = global_proxy
@@ -610,7 +627,7 @@ def run_account(server: str, global_proxy: dict | None = None) -> dict:
 
     try:
         delay = random.randint(2, 6)
-        print(f"[{server}] 启动延迟 {delay}s")
+        print(f"[{yyb_display(server)}] 启动延迟 {delay}s")
         sleep(delay)
 
         code = get_code(server)
@@ -640,7 +657,7 @@ def run_account(server: str, global_proxy: dict | None = None) -> dict:
             return result
 
         phone = userinfo.get("data", {}).get("phone", "")
-        print(f"[{server}] 登录账号：{mask_phone(phone)}")
+        print(f"[{yyb_display(server)}] 登录账号：{mask_phone(phone)}")
 
         year, month, day = china_date_parts()
         sign_date = f"{year}-{month:02d}-01"
@@ -660,11 +677,11 @@ def run_account(server: str, global_proxy: dict | None = None) -> dict:
 
         if sign_records.get("code") != 0:
             result["sign_msg"] = f"查询签到失败：{sign_records.get('message') or '未知错误'}"
-            print(f"[{server}] {result['sign_msg']}")
+            print(f"[{yyb_display(server)}] {result['sign_msg']}")
         else:
             status = bool(sign_records.get("data", {}).get("status"))
             count = sign_records.get("data", {}).get("signCount", "-")
-            print(f"[{server}] 今天{'已' if status else '未'}签到，已签到 {count} 天")
+            print(f"[{yyb_display(server)}] 今天{'已' if status else '未'}签到，已签到 {count} 天")
 
             if status:
                 result["sign_msg"] = f"今日已签到，累计 {count} 天"
@@ -682,10 +699,10 @@ def run_account(server: str, global_proxy: dict | None = None) -> dict:
 
                 if sign_save.get("code") == 0 and sign_save.get("data", {}).get("flag"):
                     result["sign_msg"] = "签到成功"
-                    print(f"[{server}] 签到成功")
+                    print(f"[{yyb_display(server)}] 签到成功")
                 else:
                     result["sign_msg"] = f"签到失败：{sign_save.get('message') or '未知错误'}"
-                    print(f"[{server}] {result['sign_msg']}")
+                    print(f"[{yyb_display(server)}] {result['sign_msg']}")
 
         rand_sleep(2, 5)
 
@@ -700,16 +717,16 @@ def run_account(server: str, global_proxy: dict | None = None) -> dict:
 
         if account.get("code") == 0:
             result["coin"] = account.get("data", {}).get("coin", "-")
-            print(f"[{server}] 当前奈雪币：{result['coin']}")
+            print(f"[{yyb_display(server)}] 当前奈雪币：{result['coin']}")
         else:
-            print(f"[{server}] 查询奈雪币失败：{account.get('message') or '未知错误'}")
+            print(f"[{yyb_display(server)}] 查询奈雪币失败：{account.get('message') or '未知错误'}")
 
         result["success"] = True
         return result
 
     except Exception as exc:
         result["error"] = str(exc)
-        print(f"[{server}] 执行异常：{exc}")
+        print(f"[{yyb_display(server)}] 执行异常：{exc}")
         return result
 
 

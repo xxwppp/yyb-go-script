@@ -66,6 +66,23 @@ except Exception: pass
 
 __atexit.register(__push)
 # === YYB_GO 统一通知注入 end ===
+# === YYB 微信备注映射注入 begin ===
+import os as _os_nm
+_NAME_MAP = {}
+_raw_nm = _os_nm.environ.get("YYB_NAME_MAP", "") or ""
+for _line_nm in _raw_nm.replace("&", "\n").splitlines():
+    _line_nm = _line_nm.strip()
+    if "=" in _line_nm:
+        _k_nm, _v_nm = _line_nm.split("=", 1)
+        _NAME_MAP[_k_nm.strip()] = _v_nm.strip()
+
+def yyb_display(entry):
+    if not entry:
+        return entry
+    _ref = entry.split("@", 1)[1] if "@" in entry else entry
+    return _NAME_MAP.get(_ref, entry)
+# === YYB 微信备注映射注入 end ===
+
 
 # name: DT生活
 # cron: 0 0 8 * * *
@@ -127,7 +144,7 @@ if len(CODE_URL_LIST) == 0:
 
 print(f"✅ 成功读取 {len(CODE_URL_LIST)} 台内网服务地址：")
 for item in CODE_URL_LIST:
-    print(f" - {item}")
+    print(f" - {yyb_display(item)}")
 print("-" * 50)
 
 # 品赞代理配置（青龙环境变量）
@@ -249,10 +266,10 @@ def validate_proxy(proxy_config):
 def get_valid_proxy(account_name):
     """获取有效代理（每个账号独立调用）"""
     if not PROXY_API:
-        print(f"ℹ️ [{account_name}] 未配置代理API，使用直连")
+        print(f"ℹ️ [{yyb_display(account_name)}] 未配置代理API，使用直连")
         return None
 
-    print(f"🔌 [{account_name}] 正在从品赞API获取专属代理 ({PROXY_TYPE})...")
+    print(f"🔌 [{yyb_display(account_name)}] 正在从品赞API获取专属代理 ({PROXY_TYPE})...")
 
     for i in range(PROXY_RETRY_TIMES):
         try:
@@ -266,10 +283,10 @@ def get_valid_proxy(account_name):
             proxy_info = parse_proxy_response(response.text)
 
             if not proxy_info:
-                print(f"⚠️ [{account_name}] 第{i+1}次获取代理失败：响应格式无法解析")
+                print(f"⚠️ [{yyb_display(account_name)}] 第{i+1}次获取代理失败：响应格式无法解析")
                 continue
 
-            print(f"✅ [{account_name}] 提取到专属代理：{proxy_info['host']}:{proxy_info['port']}")
+            print(f"✅ [{yyb_display(account_name)}] 提取到专属代理：{proxy_info['host']}:{proxy_info['port']}")
 
             # 生成代理配置并验证
             proxy_config = build_proxy_config(proxy_info)
@@ -277,16 +294,16 @@ def get_valid_proxy(account_name):
             if is_valid:
                 return proxy_config
             else:
-                print(f"⚠️ [{account_name}] 第{i+1}次获取的代理不可用，正在重试...")
+                print(f"⚠️ [{yyb_display(account_name)}] 第{i+1}次获取的代理不可用，正在重试...")
 
         except Exception as e:
-            print(f"⚠️ [{account_name}] 第{i+1}次获取代理异常：{str(e)}")
+            print(f"⚠️ [{yyb_display(account_name)}] 第{i+1}次获取代理异常：{str(e)}")
 
         # 重试间隔
         if i < PROXY_RETRY_TIMES - 1:
             time.sleep(2)
 
-    print(f"❌ [{account_name}] 连续多次获取代理失败，使用直连")
+    print(f"❌ [{yyb_display(account_name)}] 连续多次获取代理失败，使用直连")
     return None
 # ======================================================
 
@@ -348,7 +365,7 @@ def refresh_token(code_url, proxy_config, account_name):
         
         # 优先代理请求
         if proxy_config:
-            print(f"🌐 [{account_name}] 正在使用专属代理发起登录请求...")
+            print(f"🌐 [{yyb_display(account_name)}] 正在使用专属代理发起登录请求...")
             try:
                 res = requests.post(
                     LOGIN_URL,
@@ -360,7 +377,7 @@ def refresh_token(code_url, proxy_config, account_name):
                 )
             except Exception as e:
                 if ENABLE_DIRECT_FALLBACK:
-                    print(f"⚠️ [{account_name}] 代理登录失败，切换直连重试...")
+                    print(f"⚠️ [{yyb_display(account_name)}] 代理登录失败，切换直连重试...")
                     res = requests.post(
                         LOGIN_URL,
                         json=payload,
@@ -411,7 +428,7 @@ def get_user_info(token, headers, proxy_config, account_name):
                 )
             except Exception as e:
                 if ENABLE_DIRECT_FALLBACK:
-                    print(f"⚠️ [{account_name}] 代理查询用户信息失败，切换直连重试...")
+                    print(f"⚠️ [{yyb_display(account_name)}] 代理查询用户信息失败，切换直连重试...")
                     res = requests.post(
                         TOTAL_POINTS_URL,
                         json=payload,
@@ -476,7 +493,7 @@ def do_sign(token, headers, proxy_config, account_name):
                 )
             except Exception as e:
                 if ENABLE_DIRECT_FALLBACK:
-                    print(f"⚠️ [{account_name}] 代理签到失败，切换直连重试...")
+                    print(f"⚠️ [{yyb_display(account_name)}] 代理签到失败，切换直连重试...")
                     res = requests.post(
                         SIGN_URL,
                         json=payload,

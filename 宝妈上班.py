@@ -108,6 +108,23 @@ except Exception: pass
 
 __atexit.register(__push)
 # === YYB_GO 统一通知注入 end ===
+# === YYB 微信备注映射注入 begin ===
+import os as _os_nm
+_NAME_MAP = {}
+_raw_nm = _os_nm.environ.get("YYB_NAME_MAP", "") or ""
+for _line_nm in _raw_nm.replace("&", "\n").splitlines():
+    _line_nm = _line_nm.strip()
+    if "=" in _line_nm:
+        _k_nm, _v_nm = _line_nm.split("=", 1)
+        _NAME_MAP[_k_nm.strip()] = _v_nm.strip()
+
+def yyb_display(entry):
+    if not entry:
+        return entry
+    _ref = entry.split("@", 1)[1] if "@" in entry else entry
+    return _NAME_MAP.get(_ref, entry)
+# === YYB 微信备注映射注入 end ===
+
 
 import hmac
 import hashlib

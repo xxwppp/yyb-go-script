@@ -67,6 +67,42 @@ except Exception: pass
 __atexit.register(__push)
 # === YYB_GO 统一通知注入 end ===
 
+# === YYB auth injection for httpx (begin) ===
+try:
+    import os as _yyb_os, base64 as _yyb_b64
+    import httpx as _yyb_httpx
+    def _yyb_httpx_auth_headers():
+        _t = (_yyb_os.environ.get("YYB_TOKEN") or "").strip()
+        _u = (_yyb_os.environ.get("YYB_USER") or "").strip()
+        _p = (_yyb_os.environ.get("YYB_PASS") or "").strip()
+        if _t:
+            return {"Authorization": "Bearer " + _t}
+        if _u and _p:
+            _c = _yyb_b64.b64encode((_u + ":" + _p).encode("utf-8")).decode("ascii")
+            return {"Authorization": "Basic " + _c}
+        return {}
+    def _yyb_httpx_patch(req):
+        try:
+            if "/wxapp/getCode" in str(req.url):
+                for _k, _v in _yyb_httpx_auth_headers().items():
+                    if _k not in req.headers:
+                        req.headers[_k] = _v
+        except Exception:
+            pass
+    _yyb_async_send = _yyb_httpx.AsyncClient.send
+    _yyb_sync_send = _yyb_httpx.Client.send
+    async def _yyb_async_send_wrap(self, request, *a, **kw):
+        _yyb_httpx_patch(request)
+        return await _yyb_async_send(self, request, *a, **kw)
+    def _yyb_sync_send_wrap(self, request, *a, **kw):
+        _yyb_httpx_patch(request)
+        return _yyb_sync_send(self, request, *a, **kw)
+    _yyb_httpx.AsyncClient.send = _yyb_async_send_wrap
+    _yyb_httpx.Client.send = _yyb_sync_send_wrap
+except Exception:
+    pass
+# === YYB auth injection for httpx (end) ===
+
 # name: 雀巢
 # cron: 0 40 13 * * *
 # -*- coding: utf-8 -*-
@@ -97,7 +133,12 @@ __atexit.register(__push)
 # │ PROXY_TYPE    │ 可选     │ 代理类型：http(默认) 或 socks5       │
 # │ PLUSPLUS_TOKEN│ 可选     │ PushPlus推送Token，用于接收任务结果  │
 # │ YYB_GO         │ 必填     │ 内网wxcode服务地址，多个用换行或&分隔     │
+# │ YYB_NAME_MAP  │ 可选     │ openid=微信备注，日志显示备注而非原始地址  │
 # └───────────────┴──────────┴─────────────────────────────────────┘
+#
+# YYB_NAME_MAP示例值（每行一个，openid=备注）：
+# owNAX6rgZe4o2XM4F_udpf1hhVaE=w0390
+# owNAX6vC5tBOEBnNct9vfbdPRRKU=甜梦甜
 #
 # YYB_GO示例值（换行或&分隔）：
 # 127.0.0.1:8088
@@ -192,19 +233,22 @@ if env_YYB_GO:
     raw_lines = env_YYB_GO.replace("&", "\n").splitlines()
     SERVERS = [line.strip() for line in raw_lines if line.strip()]
 
-# 无有效地址直接退出并提示
-if len(SERVERS) == 0:
-    print("❌ 错误：未读取到环境变量 YYB_GO 或无有效服务地址！")
-    print("配置示例（青龙环境变量YYB_GO值，每个地址用换行或&分隔）：")
-    print("127.0.0.1:8088")
-    print("192.168.1.21:8088")
-    print("10.30.9.49:8088")
-    sys.exit(1)
+# 微信备注映射：让日志显示 w0390/甜梦甜 而不是 yyb.xxxxx@openid
+# 格式：每行 openid=备注，或 & 分隔；示例：owNAX6...=w0390
+NAME_MAP = {}
+_name_map_raw = os.getenv("YYB_NAME_MAP", "") or ""
+for line in _name_map_raw.replace("&", "\n").splitlines():
+    line = line.strip()
+    if "=" in line:
+        k, v = line.split("=", 1)
+        NAME_MAP[k.strip()] = v.strip()
 
-print(f"✅ 成功读取 {len(SERVERS)} 台内网wxcode服务：")
-for item in SERVERS:
-    print(f" - {item}")
-print("-" * 60 + "\n")
+
+def get_account_display(ref: str, server_entry: str) -> str:
+    if ref and ref in NAME_MAP:
+        return NAME_MAP[ref]
+    return server_entry
+
 
 def parse_yyb_go_entry(raw_value: str) -> Tuple[str, str]:
     value = str(raw_value or "").strip()
@@ -219,33 +263,75 @@ def parse_yyb_go_entry(raw_value: str) -> Tuple[str, str]:
     return server, ref
 
 
+# 无有效地址直接退出并提示
+if len(SERVERS) == 0:
+    print("❌ 错误：未读取到环境变量 YYB_GO 或无有效服务地址！")
+    print("配置示例（青龙环境变量YYB_GO值，每个地址用换行或&分隔）：")
+    print("127.0.0.1:8088")
+    print("192.168.1.21:8088")
+    print("10.30.9.49:8088")
+    sys.exit(1)
+
+print(f"✅ 成功读取 {len(SERVERS)} 台内网wxcode服务：")
+for item in SERVERS:
+    _, _ref = parse_yyb_go_entry(item)
+    _display = get_account_display(_ref, item)
+    print(f" - {_display}")
+print("-" * 60 + "\n")
+
+
+def build_yyb_auth_header() -> Optional[str]:
+    """自包含构造 YYB 鉴权头（Basic/Bearer），不依赖任何猴子补丁。"""
+    _t = (os.environ.get("YYB_TOKEN") or "").strip()
+    _u = (os.environ.get("YYB_USER") or "").strip()
+    _p = (os.environ.get("YYB_PASS") or "").strip()
+    if _t:
+        return "Bearer " + _t
+    if _u and _p:
+        _c = base64.b64encode((_u + ":" + _p).encode("utf-8")).decode("ascii")
+        return "Basic " + _c
+    return None
+
+
 async def get_code_via_yyb(server_entry: str, appid: str) -> Optional[str]:
     server, ref = parse_yyb_go_entry(server_entry)
+    display = get_account_display(ref, server_entry)
     if not server:
-        print(f"❌ [{server_entry}] 获取code失败 | 服务地址为空")
+        print(f"❌ [{display}] 获取code失败 | 服务地址为空")
         return None
     if not ref:
-        print(f"❌ [{server_entry}] 获取code失败 | 缺少openid/ref")
+        print(f"❌ [{display}] 获取code失败 | 缺少openid/ref")
         return None
 
     url = f"https://{server}/wxapp/getCode"
+    auth = build_yyb_auth_header()
+    req_headers = {"Content-Type": "application/json"}
+    if auth:
+        req_headers["Authorization"] = auth
+    else:
+        print(f"⚠️ [{display}] 未检测到 YYB_USER/YYB_PASS/YYB_TOKEN，getCode 可能返回 401 未鉴权")
+
     try:
         async with httpx.AsyncClient(timeout=20.0, trust_env=False) as client:
-            response = await client.post(url, json={"ref": ref, "app_id": appid})
-            res = response.json()
+            response = await client.post(url, json={"ref": ref, "app_id": appid}, headers=req_headers)
 
-        code = (((res.get("data") or {}).get("result") or {}).get("code"))
-        if res.get("code") != 0 or not code:
-            print(f"❌ [{server_entry}] 获取code失败 | 返回异常: {str(res)[:200]}")
+        if response.status_code != 200:
+            print(f"❌ [{display}] 获取code失败 | HTTP {response.status_code} 未鉴权或网关错误 | {response.text[:160]}")
             return None
 
-        print(f"✅ [{server}] 获取code成功")
+        res = response.json()
+        code = (((res.get("data") or {}).get("result") or {}).get("code"))
+        if res.get("code") != 0 or not code:
+            print(f"❌ [{display}] 获取code失败 | 返回异常: {str(res)[:200]}")
+            return None
+
+        print(f"✅ [{display}] 获取code成功")
         return code
     except json.JSONDecodeError:
-        print(f"❌ [{server_entry}] 获取code失败 | 响应不是JSON格式")
+        print(f"❌ [{display}] 获取code失败 | 响应不是JSON格式 | HTTP {response.status_code} | {response.text[:160]}")
         return None
     except Exception as e:
-        print(f"❌ [{server_entry}] 获取code异常 | 原因: {str(e)}")
+        print(f"❌ [{display}] 获取code异常 | 原因: {str(e)}")
         return None
 
 
@@ -425,6 +511,8 @@ class QueChaoBot:
         self.token = None
         self.ua = get_ua()
         self.client = None
+        _, _ref = parse_yyb_go_entry(server)
+        self.display_name = get_account_display(_ref, server)
 
     async def get_code(self) -> Optional[str]:
         """从本地服务获取code（青龙优化版日志）"""
@@ -432,7 +520,7 @@ class QueChaoBot:
 
     async def get_token_by_code(self, code: str) -> Optional[str]:
         """通过code换取token（简洁日志）"""
-        print(f"🔑 [{self.server}] 正在换取token...")
+        print(f"🔑 [{self.display_name}] 正在换取token...")
 
         headers = {
             "Host": "crm.nestlechinese.com",
@@ -474,15 +562,15 @@ class QueChaoBot:
             res = response.json()
             if res.get("access_token") and res.get("token_type", "Bearer").lower() == "bearer":
                 self.token = res["access_token"]
-                print(f"✅ [{self.server}] 获取token成功 | 模式: {mode}")
+                print(f"✅ [{self.display_name}] 获取token成功 | 模式: {mode}")
                 return self.token
             else:
                 raise Exception(f"业务错误: {res.get('error', '未知错误')}")
         except Exception as e:
-            print(f"⚠️ [{self.server}] {mode}获取token失败 | 原因: {str(e)}")
+            print(f"⚠️ [{self.display_name}] {mode}获取token失败 | 原因: {str(e)}")
 
             if self.proxy_info and ENABLE_DIRECT_FALLBACK:
-                print(f"🌐 [{self.server}] 切换直连重试...")
+                print(f"🌐 [{self.display_name}] 切换直连重试...")
                 try:
                     async with httpx.AsyncClient(
                         headers=headers,
@@ -495,12 +583,12 @@ class QueChaoBot:
                     res = response.json()
                     if res.get("access_token"):
                         self.token = res["access_token"]
-                        print(f"✅ [{self.server}] 直连获取token成功")
+                        print(f"✅ [{self.display_name}] 直连获取token成功")
                         return self.token
                     else:
                         raise Exception(f"直连业务错误: {res.get('error', '未知错误')}")
                 except Exception as e2:
-                    print(f"❌ [{self.server}] 直连获取token失败 | 原因: {str(e2)}")
+                    print(f"❌ [{self.display_name}] 直连获取token失败 | 原因: {str(e2)}")
 
         return None
 
@@ -539,7 +627,7 @@ class QueChaoBot:
 
     def check_response(self, response_data: Dict[str, Any]) -> bool:
         if response_data.get("errcode") != 200:
-            print(f"❌ [{self.server}] 请求失败 | 原因: {response_data.get('errmsg', '未知错误')}")
+            print(f"❌ [{self.display_name}] 请求失败 | 原因: {response_data.get('errmsg', '未知错误')}")
             return False
         return True
 
@@ -555,7 +643,7 @@ class QueChaoBot:
                 return response_data.get("data")
             return None
         except Exception as e:
-            print(f"❌ [{self.server}] 获取积分失败 | 原因: {str(e)}")
+            print(f"❌ [{self.display_name}] 获取积分失败 | 原因: {str(e)}")
             return None
 
     async def daily_sign(self) -> Tuple[bool, str]:
@@ -568,7 +656,7 @@ class QueChaoBot:
 
             if response_data.get("errcode") == 201:
                 sign_msg = "今日已签到"
-                print(f"ℹ️ [{self.server}] {sign_msg}")
+                print(f"ℹ️ [{self.display_name}] {sign_msg}")
                 return True, sign_msg
 
             if self.check_response(response_data):
@@ -576,16 +664,16 @@ class QueChaoBot:
                 sign_day = data.get("sign_day", 0)
                 sign_points = data.get("sign_points", 0)
                 sign_msg = f"签到成功 | 连续{sign_day}天 | +{sign_points}积分"
-                print(f"✅ [{self.server}] {sign_msg}")
+                print(f"✅ [{self.display_name}] {sign_msg}")
                 return True, sign_msg
             else:
                 sign_msg = f"签到失败: {response_data.get('errmsg', '未知错误')}"
-                print(f"❌ [{self.server}] {sign_msg}")
+                print(f"❌ [{self.display_name}] {sign_msg}")
                 return False, sign_msg
 
         except Exception as e:
             sign_msg = f"签到异常: {str(e)}"
-            print(f"❌ [{self.server}] {sign_msg}")
+            print(f"❌ [{self.display_name}] {sign_msg}")
             return False, sign_msg
 
     async def get_task_list(self) -> List[Dict[str, Any]]:
@@ -603,11 +691,11 @@ class QueChaoBot:
                     if task.get("task_status") == 0
                     and task.get("task_guid") not in SKIP_TASK_GUIDS
                 ]
-                print(f"📋 [{self.server}] 待完成任务: {len(uncompleted_tasks)}个")
+                print(f"📋 [{self.display_name}] 待完成任务: {len(uncompleted_tasks)}个")
                 return uncompleted_tasks
             return []
         except Exception as e:
-            print(f"❌ [{self.server}] 获取任务列表失败 | 原因: {str(e)}")
+            print(f"❌ [{self.display_name}] 获取任务列表失败 | 原因: {str(e)}")
             return []
 
     async def complete_task(self, task_guid: str, task_desc: str) -> Tuple[bool, str]:
@@ -620,21 +708,21 @@ class QueChaoBot:
 
             if self.check_response(response_data):
                 msg = f"完成【{task_desc}】 | +2积分"
-                print(f"✅ [{self.server}] {msg}")
+                print(f"✅ [{self.display_name}] {msg}")
                 return True, msg
             else:
                 msg = f"【{task_desc}】失败: {response_data.get('errmsg', '未知错误')}"
-                print(f"❌ [{self.server}] {msg}")
+                print(f"❌ [{self.display_name}] {msg}")
                 return False, msg
 
         except Exception as e:
             msg = f"【{task_desc}】异常: {str(e)}"
-            print(f"❌ [{self.server}] {msg}")
+            print(f"❌ [{self.display_name}] {msg}")
             return False, msg
 
     async def run(self) -> Dict[str, Any]:
         result = {
-            "server": self.server,
+            "server": self.display_name,
             "success": False,
             "proxy_status": "直连" if not self.proxy_info else "专属代理",
             "sign_msg": "",
@@ -646,7 +734,7 @@ class QueChaoBot:
         }
 
         print(f"\n{'='*40}")
-        print(f"[{self.server}] 开始执行任务")
+        print(f"[{self.display_name}] 开始执行任务")
         print(f"{'='*40}")
 
         try:
@@ -672,7 +760,7 @@ class QueChaoBot:
                     return result
 
                 result["initial_score"] = initial_balance
-                print(f"💰 [{self.server}] 初始积分: {initial_balance}")
+                print(f"💰 [{self.display_name}] 初始积分: {initial_balance}")
 
                 # 每日签到
                 sign_success, sign_msg = await self.daily_sign()
@@ -696,14 +784,14 @@ class QueChaoBot:
                 if final_balance is not None:
                     result["final_score"] = final_balance
                     result["gained_score"] = final_balance - initial_balance
-                    print(f"📊 [{self.server}] 今日新增: {result['gained_score']}积分 | 当前: {final_balance}")
+                    print(f"📊 [{self.display_name}] 今日新增: {result['gained_score']}积分 | 当前: {final_balance}")
 
                 result["success"] = True
-                print(f"✅ [{self.server}] 任务执行完成")
+                print(f"✅ [{self.display_name}] 任务执行完成")
 
         except Exception as e:
             result["error"] = str(e)
-            print(f"❌ [{self.server}] 执行异常 | 原因: {str(e)}")
+            print(f"❌ [{self.display_name}] 执行异常 | 原因: {str(e)}")
 
         return result
 
@@ -720,9 +808,12 @@ async def main():
 
     results = []
     for index, server in enumerate(SERVERS):
+        _, _ref = parse_yyb_go_entry(server)
+        display_name = get_account_display(_ref, server)
+
         proxy_info = global_proxy_info
         if ENABLE_PER_ACCOUNT_PROXY:
-            proxy_info = await get_valid_proxy(server)
+            proxy_info = await get_valid_proxy(display_name)
             await sleep(PROXY_FETCH_INTERVAL)
 
         bot = QueChaoBot(server, proxy_info)

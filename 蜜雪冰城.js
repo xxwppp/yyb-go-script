@@ -65,6 +65,21 @@
   process.on('beforeExit', () => { if (!__exiting) { __exiting = true; try { __flush(); } catch (e) {} } });
 })();
 // === YYB_GO 统一通知注入 end ===
+// === YYB 微信备注映射注入 begin ===
+const _NAME_MAP = {};
+const _raw_nm = process.env.YYB_NAME_MAP || "";
+_raw_nm.split(/[\n&]/).forEach(function (line) {
+  line = line.trim();
+  const idx = line.indexOf("=");
+  if (idx > 0) _NAME_MAP[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+});
+function yybDisplay(entry) {
+  if (!entry) return entry;
+  const ref = entry.indexOf("@") !== -1 ? entry.slice(entry.indexOf("@") + 1) : entry;
+  return _NAME_MAP[ref] !== undefined ? _NAME_MAP[ref] : entry;
+}
+// === YYB 微信备注映射注入 end ===
+
 
 // name: 蜜雪冰城
 // cron: 0 0 12 * * *
@@ -116,7 +131,7 @@ if (SERVERS.length === 0) {
     process.exit(1);
 }
 console.log(`✅ 成功读取 ${SERVERS.length} 台内网wxcode服务：`);
-SERVERS.forEach(item => console.log(` - ${item}`));
+SERVERS.forEach(item => console.log(` - ${yybDisplay(item)}`));
 console.log("----------------------------------------\n");
 
 // 固定配置（无需修改）
@@ -265,7 +280,7 @@ async function runServer(server) {
     };
 
     console.log(`\n==============================`);
-    console.log(`蜜雪冰城 - ${server} 账号任务`);
+    console.log(`蜜雪冰城 - ${yybDisplay(server)} 账号任务`);
     console.log(`==============================`);
 
     try {

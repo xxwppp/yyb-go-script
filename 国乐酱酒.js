@@ -65,6 +65,21 @@
   process.on('beforeExit', () => { if (!__exiting) { __exiting = true; try { __flush(); } catch (e) {} } });
 })();
 // === YYB_GO 统一通知注入 end ===
+// === YYB 微信备注映射注入 begin ===
+const _NAME_MAP = {};
+const _raw_nm = process.env.YYB_NAME_MAP || "";
+_raw_nm.split(/[\n&]/).forEach(function (line) {
+  line = line.trim();
+  const idx = line.indexOf("=");
+  if (idx > 0) _NAME_MAP[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+});
+function yybDisplay(entry) {
+  if (!entry) return entry;
+  const ref = entry.indexOf("@") !== -1 ? entry.slice(entry.indexOf("@") + 1) : entry;
+  return _NAME_MAP[ref] !== undefined ? _NAME_MAP[ref] : entry;
+}
+// === YYB 微信备注映射注入 end ===
+
 
 // name: 国乐酱酒
 // cron: 0 40 9 * * *
@@ -115,7 +130,7 @@ if (SERVERS.length === 0) {
     process.exit(1);
 }
 console.log(`✅ 成功读取 ${SERVERS.length} 台内网服务器：`);
-SERVERS.forEach(item => console.log(` - ${item}`));
+SERVERS.forEach(item => console.log(` - ${yybDisplay(item)}`));
 console.log("----------------------------------------\n");
 
 // 固定配置
@@ -236,11 +251,11 @@ async function codeLogin(server) {
     });
 
     if (data.code === 0) {
-      console.log(`✅ [${server}] 登录成功`);
+      console.log(`✅ [{yybDisplay(server)}] 登录成功`);
       return data.data.authorization;
     }
   } catch (e) {
-    console.log(`❌ [${server}] 登录失败：`, e.message);
+    console.log(`❌ [{yybDisplay(server)}] 登录失败：`, e.message);
   }
   return null;
 }
@@ -260,14 +275,14 @@ async function sign(server, token) {
       signResult.success = true;
       signResult.msg = "签到成功";
       signResult.spanSumDays = data.data.spanSumDays;
-      console.log(`📊 [${server}] 签到成功 | 连续 ${data.data.spanSumDays} 天`);
+      console.log(`📊 [{yybDisplay(server)}] 签到成功 | 连续 ${data.data.spanSumDays} 天`);
     } else {
       signResult.msg = data.message;
-      console.log(`❌ [${server}] 签到失败：${data.message}`);
+      console.log(`❌ [{yybDisplay(server)}] 签到失败：${data.message}`);
     }
   } catch (e) {
     signResult.msg = "签到异常：" + e.message;
-    console.log(`❌ [${server}] 签到异常：`, e.message);
+    console.log(`❌ [{yybDisplay(server)}] 签到异常：`, e.message);
   }
   return signResult;
 }
@@ -285,11 +300,11 @@ async function getPoints(server, token) {
     if (data.code === 0) {
       pointResult.success = true;
       pointResult.score = data.data.score;
-      console.log(`💰 [${server}] 总积分：${data.data.score}`);
+      console.log(`💰 [{yybDisplay(server)}] 总积分：${data.data.score}`);
     }
   } catch (e) {
     pointResult.msg = "查询积分异常：" + e.message;
-    console.log(`❌ [${server}] 查询积分异常：`, e.message);
+    console.log(`❌ [{yybDisplay(server)}] 查询积分异常：`, e.message);
   }
   return pointResult;
 }
@@ -303,7 +318,7 @@ async function runServer(server) {
     pointResult: {}
   };
 
-  console.log(`\n===== 国乐酱酒 - ${server} 账号 =====`);
+  console.log(`\n===== 国乐酱酒 - ${yybDisplay(server)} 账号 =====`);
   await sleep(jitter(1500));
   
   // 登录

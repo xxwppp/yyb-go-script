@@ -66,6 +66,59 @@ except Exception: pass
 
 __atexit.register(__push)
 # === YYB_GO 统一通知注入 end ===
+# === YYB 微信备注映射注入 begin ===
+import os as _os_nm
+_NAME_MAP = {}
+_raw_nm = _os_nm.environ.get("YYB_NAME_MAP", "") or ""
+for _line_nm in _raw_nm.replace("&", "\n").splitlines():
+    _line_nm = _line_nm.strip()
+    if "=" in _line_nm:
+        _k_nm, _v_nm = _line_nm.split("=", 1)
+        _NAME_MAP[_k_nm.strip()] = _v_nm.strip()
+
+def yyb_display(entry):
+    if not entry:
+        return entry
+    _ref = entry.split("@", 1)[1] if "@" in entry else entry
+    return _NAME_MAP.get(_ref, entry)
+# === YYB 微信备注映射注入 end ===
+
+
+# === YYB auth injection for httpx (begin) ===
+try:
+    import os as _yyb_os, base64 as _yyb_b64
+    import httpx as _yyb_httpx
+    def _yyb_httpx_auth_headers():
+        _t = (_yyb_os.environ.get("YYB_TOKEN") or "").strip()
+        _u = (_yyb_os.environ.get("YYB_USER") or "").strip()
+        _p = (_yyb_os.environ.get("YYB_PASS") or "").strip()
+        if _t:
+            return {"Authorization": "Bearer " + _t}
+        if _u and _p:
+            _c = _yyb_b64.b64encode((_u + ":" + _p).encode("utf-8")).decode("ascii")
+            return {"Authorization": "Basic " + _c}
+        return {}
+    def _yyb_httpx_patch(req):
+        try:
+            if "/wxapp/getCode" in str(req.url):
+                for _k, _v in _yyb_httpx_auth_headers().items():
+                    if _k not in req.headers:
+                        req.headers[_k] = _v
+        except Exception:
+            pass
+    _yyb_async_send = _yyb_httpx.AsyncClient.send
+    _yyb_sync_send = _yyb_httpx.Client.send
+    async def _yyb_async_send_wrap(self, request, *a, **kw):
+        _yyb_httpx_patch(request)
+        return await _yyb_async_send(self, request, *a, **kw)
+    def _yyb_sync_send_wrap(self, request, *a, **kw):
+        _yyb_httpx_patch(request)
+        return _yyb_sync_send(self, request, *a, **kw)
+    _yyb_httpx.AsyncClient.send = _yyb_async_send_wrap
+    _yyb_httpx.Client.send = _yyb_sync_send_wrap
+except Exception:
+    pass
+# === YYB auth injection for httpx (end) ===
 
 # name: 捷停车
 # cron: 0 20 10 * * *
@@ -139,7 +192,7 @@ if len(SERVERS) == 0:
 
 print(f"✅ 成功读取 {len(SERVERS)} 台内网wxcode服务：")
 for item in SERVERS:
-    print(f" - {item}")
+    print(f" - {yyb_display(item)}")
 print("-" * 60 + "\n")
 
 # PushPlus 通知Token（环境变量，可选）
@@ -210,10 +263,10 @@ def parse_yyb_go_entry(raw_value: str) -> Tuple[str, str]:
 async def get_code_via_yyb(server_entry: str, appid: str) -> Optional[str]:
     server, ref = parse_yyb_go_entry(server_entry)
     if not server:
-        print(f"❌ [{server_entry}] 获取code失败 | 服务地址为空")
+        print(f"❌ [{yyb_display(server_entry)}] 获取code失败 | 服务地址为空")
         return None
     if not ref:
-        print(f"❌ [{server_entry}] 获取code失败 | 缺少openid/ref")
+        print(f"❌ [{yyb_display(server_entry)}] 获取code失败 | 缺少openid/ref")
         return None
 
     url = f"https://{server}/wxapp/getCode"
@@ -224,16 +277,16 @@ async def get_code_via_yyb(server_entry: str, appid: str) -> Optional[str]:
 
         code = (((res.get("data") or {}).get("result") or {}).get("code"))
         if res.get("code") != 0 or not code:
-            print(f"❌ [{server_entry}] 获取code失败 | 返回异常: {str(res)[:200]}")
+            print(f"❌ [{yyb_display(server_entry)}] 获取code失败 | 返回异常: {str(res)[:200]}")
             return None
 
-        print(f"✅ [{server}] 获取code成功")
+        print(f"✅ [{yyb_display(server)}] 获取code成功")
         return code
     except json.JSONDecodeError:
-        print(f"❌ [{server_entry}] 获取code失败 | 响应不是JSON格式")
+        print(f"❌ [{yyb_display(server_entry)}] 获取code失败 | 响应不是JSON格式")
         return None
     except Exception as e:
-        print(f"❌ [{server_entry}] 获取code异常 | 原因: {str(e)}")
+        print(f"❌ [{yyb_display(server_entry)}] 获取code异常 | 原因: {str(e)}")
         return None
 
 # ===================== 品赞代理系统 =====================
@@ -309,10 +362,10 @@ def build_proxy_transport(proxy_info: Dict[str, Any]) -> Optional[AsyncProxyTran
 
 async def get_valid_proxy(account_name: str) -> Optional[Dict[str, Any]]:
     if not PROXY_API:
-        print(f"ℹ️ [{account_name}] 未配置代理 | 使用直连模式")
+        print(f"ℹ️ [{yyb_display(account_name)}] 未配置代理 | 使用直连模式")
         return None
 
-    print(f"🔌 [{account_name}] 正在获取专属代理...")
+    print(f"🔌 [{yyb_display(account_name)}] 正在获取专属代理...")
 
     for i in range(PROXY_RETRY_TIMES):
         try:
@@ -321,21 +374,21 @@ async def get_valid_proxy(account_name: str) -> Optional[Dict[str, Any]]:
             proxy_info = parse_proxy_response(response.text)
 
             if not proxy_info:
-                print(f"⚠️ [{account_name}] 第{i+1}次获取代理失败 | 响应格式错误")
+                print(f"⚠️ [{yyb_display(account_name)}] 第{i+1}次获取代理失败 | 响应格式错误")
                 continue
 
             if await validate_proxy(proxy_info):
                 return proxy_info
             else:
-                print(f"⚠️ [{account_name}] 第{i+1}次代理不可用 | 重试中...")
+                print(f"⚠️ [{yyb_display(account_name)}] 第{i+1}次代理不可用 | 重试中...")
 
         except Exception as e:
-            print(f"⚠️ [{account_name}] 第{i+1}次获取代理异常 | 原因: {str(e)}")
+            print(f"⚠️ [{yyb_display(account_name)}] 第{i+1}次获取代理异常 | 原因: {str(e)}")
 
         if i < PROXY_RETRY_TIMES - 1:
             await sleep(2000)
 
-    print(f"❌ [{account_name}] 代理获取失败 | 切换直连模式")
+    print(f"❌ [{yyb_display(account_name)}] 代理获取失败 | 切换直连模式")
     return None
 
 # ===================== 智能代理管理器（新增） =====================
@@ -363,12 +416,12 @@ class ProxyManager:
     async def rebuild(self) -> bool:
         """重建代理（失败时自动降级为直连）"""
         if self.rebuild_count >= self.max_rebuild:
-            print(f"❌ [{self.account_name}] 代理重建次数已达上限，切换为直连模式")
+            print(f"❌ [{yyb_display(self.account_name)}] 代理重建次数已达上限，切换为直连模式")
             self.proxy_info = None
             return False
 
         self.rebuild_count += 1
-        print(f"🔄 [{self.account_name}] 正在重建代理（第{self.rebuild_count}次）...")
+        print(f"🔄 [{yyb_display(self.account_name)}] 正在重建代理（第{self.rebuild_count}次）...")
 
         # 关闭旧代理连接
         if self.proxy_info:
@@ -376,10 +429,10 @@ class ProxyManager:
 
         new_proxy = await self.get_proxy()
         if new_proxy:
-            print(f"✅ [{self.account_name}] 代理重建成功 | 新出口IP: {new_proxy['host']}:{new_proxy['port']}")
+            print(f"✅ [{yyb_display(self.account_name)}] 代理重建成功 | 新出口IP: {new_proxy['host']}:{new_proxy['port']}")
             return True
         else:
-            print(f"⚠️ [{self.account_name}] 代理重建失败，切换为直连模式")
+            print(f"⚠️ [{yyb_display(self.account_name)}] 代理重建失败，切换为直连模式")
             return False
 
     def is_proxy_error(self, e: Exception) -> bool:
@@ -547,7 +600,7 @@ class JtcBot:
             verify=False
         )
 
-        print(f"🔌 [{self.server}] 客户端已重建 | 当前模式: {mode}")
+        print(f"🔌 [{yyb_display(self.server)}] 客户端已重建 | 当前模式: {mode}")
 
     def _get_base_headers(self) -> Dict[str, Any]:
         headers = {
@@ -576,7 +629,7 @@ class JtcBot:
                 return response
             except Exception as e:
                 if self.proxy_manager and self.proxy_manager.is_proxy_error(e):
-                    print(f"⚠️ [{self.server}] 请求失败 | 代理错误: {str(e)}")
+                    print(f"⚠️ [{yyb_display(self.server)}] 请求失败 | 代理错误: {str(e)}")
                     if retry == 0:
                         # 第一次失败：重建代理
                         await self.proxy_manager.rebuild()
@@ -584,7 +637,7 @@ class JtcBot:
                         continue
                     else:
                         # 第二次失败：降级为直连
-                        print(f"⚠️ [{self.server}] 代理重试失败，切换直连重试")
+                        print(f"⚠️ [{yyb_display(self.server)}] 代理重试失败，切换直连重试")
                         self.proxy_manager.proxy_info = None
                         await self._rebuild_client()
                         continue
@@ -601,7 +654,7 @@ class JtcBot:
 
     async def get_token_by_code(self, code: str) -> Optional[str]:
         """通过code换取token（适配最新obj响应格式）"""
-        print(f"🔑 [{self.server}] 正在换取token...")
+        print(f"🔑 [{yyb_display(self.server)}] 正在换取token...")
 
         timestamp = int(time.time() * 1000)
         token_url = f"{TOKEN_BASE_URL}?t={timestamp}"
@@ -632,7 +685,7 @@ class JtcBot:
             transport = build_proxy_transport(self.proxy_manager.proxy_info) if self.proxy_manager.proxy_info else build_direct_transport()
             mode = "代理" if self.proxy_manager.proxy_info else "直连"
 
-            print(f"🌐 [{self.server}] 使用{mode}发起token请求 | URL: {token_url}")
+            print(f"🌐 [{yyb_display(self.server)}] 使用{mode}发起token请求 | URL: {token_url}")
             async with httpx.AsyncClient(
                 transport=transport,
                 headers=headers,
@@ -642,7 +695,7 @@ class JtcBot:
             ) as client:
                 response = await client.post(token_url, json=payload)
 
-            print(f"📝 [{self.server}] token接口响应 | 状态码: {response.status_code}")
+            print(f"📝 [{yyb_display(self.server)}] token接口响应 | 状态码: {response.status_code}")
 
             if response.status_code != 200:
                 raise Exception(f"HTTP错误: {response.status_code}")
@@ -651,20 +704,20 @@ class JtcBot:
             # 适配最新响应格式（resultCode=0表示成功，token在obj字段）
             if res.get("resultCode") == "0" and res.get("obj") and res["obj"].get("token"):
                 self.token = res["obj"]["token"]
-                print(f"✅ [{self.server}] 获取token成功 | 模式: {mode}")
+                print(f"✅ [{yyb_display(self.server)}] 获取token成功 | 模式: {mode}")
                 return self.token
             # 兼容旧格式
             elif (res.get("success") and res.get("data") and res["data"].get("token")):
                 self.token = res["data"]["token"]
-                print(f"✅ [{self.server}] 获取token成功（旧格式）| 模式: {mode}")
+                print(f"✅ [{yyb_display(self.server)}] 获取token成功（旧格式）| 模式: {mode}")
                 return self.token
             else:
                 raise Exception(f"业务错误: {res.get('message', '未知错误')}")
         except Exception as e:
-            print(f"⚠️ [{self.server}] {mode}获取token失败 | 原因: {str(e)}")
+            print(f"⚠️ [{yyb_display(self.server)}] {mode}获取token失败 | 原因: {str(e)}")
 
             if self.proxy_manager.proxy_info and ENABLE_DIRECT_FALLBACK:
-                print(f"🌐 [{self.server}] 切换直连重试...")
+                print(f"🌐 [{yyb_display(self.server)}] 切换直连重试...")
                 try:
                     async with httpx.AsyncClient(
                         headers=headers,
@@ -675,21 +728,21 @@ class JtcBot:
                     ) as client:
                         response = await client.post(token_url, json=payload)
 
-                    print(f"📝 [{self.server}] 直连响应 | 状态码: {response.status_code}")
+                    print(f"📝 [{yyb_display(self.server)}] 直连响应 | 状态码: {response.status_code}")
 
                     res = response.json()
                     if res.get("resultCode") == "0" and res.get("obj") and res["obj"].get("token"):
                         self.token = res["obj"]["token"]
-                        print(f"✅ [{self.server}] 直连获取token成功")
+                        print(f"✅ [{yyb_display(self.server)}] 直连获取token成功")
                         return self.token
                     elif (res.get("success") and res.get("data") and res["data"].get("token")):
                         self.token = res["data"]["token"]
-                        print(f"✅ [{self.server}] 直连获取token成功（旧格式）")
+                        print(f"✅ [{yyb_display(self.server)}] 直连获取token成功（旧格式）")
                         return self.token
                     else:
                         raise Exception(f"直连业务错误: {res.get('message', '未知错误')}")
                 except Exception as e2:
-                    print(f"❌ [{self.server}] 直连获取token失败 | 原因: {str(e2)}")
+                    print(f"❌ [{yyb_display(self.server)}] 直连获取token失败 | 原因: {str(e2)}")
 
         return None
 
@@ -703,7 +756,7 @@ class JtcBot:
             exp = decoded.get("exp")
             return exp
         except Exception as e:
-            print(f"❌ [{self.server}] JWT解析失败 | 原因: {str(e)}")
+            print(f"❌ [{yyb_display(self.server)}] JWT解析失败 | 原因: {str(e)}")
             return None
 
     async def get_location_info(self):
@@ -722,12 +775,12 @@ class JtcBot:
                 self.longitude = base_lon + random.randint(0, 9999999999999) / 10**16
                 self.latitude = base_lat + random.randint(0, 999999999999999) / 10**18
 
-                print(f"✅ [{self.server}] 经纬度已补全 | 经度: {self.longitude:.6f} | 纬度: {self.latitude:.6f}")
+                print(f"✅ [{yyb_display(self.server)}] 经纬度已补全 | 经度: {self.longitude:.6f} | 纬度: {self.latitude:.6f}")
                 return True
             else:
                 raise Exception("无法解析经纬度")
         except Exception as e:
-            print(f"ℹ️ [{self.server}] 使用默认北京坐标 | 原因: {str(e)}")
+            print(f"ℹ️ [{yyb_display(self.server)}] 使用默认北京坐标 | 原因: {str(e)}")
             self.longitude = 116.413384
             self.latitude = 39.910925
             return True
@@ -772,9 +825,9 @@ class JtcBot:
             error_msg = response_data.get("message", "未知错误")
             # 特殊处理："已达到最大领取次数"视为成功
             if "已达到最大领取次数" in error_msg:
-                print(f"ℹ️ [{self.server}] {error_msg}")
+                print(f"ℹ️ [{yyb_display(self.server)}] {error_msg}")
                 return True
-            print(f"❌ [{self.server}] 请求失败 | 原因: {error_msg}")
+            print(f"❌ [{yyb_display(self.server)}] 请求失败 | 原因: {error_msg}")
             return False
         return True
 
@@ -813,12 +866,12 @@ class JtcBot:
                 return response_data.get("obj", {})
             return None
         except Exception as e:
-            print(f"❌ [{self.server}] 获取用户信息失败 | 原因: {str(e)}")
+            print(f"❌ [{yyb_display(self.server)}] 获取用户信息失败 | 原因: {str(e)}")
             return None
 
     async def perform_sign_in(self):
         """执行签到操作（使用安全请求）"""
-        print(f"📝 [{self.server}] 开始执行签到...")
+        print(f"📝 [{yyb_display(self.server)}] 开始执行签到...")
 
         try:
             # 签到任务查询
@@ -853,18 +906,18 @@ class JtcBot:
             response_data = response.json()
 
             if "今日已签到" in response_data.get("message", ""):
-                print(f"ℹ️ [{self.server}] 今日已签到")
+                print(f"ℹ️ [{yyb_display(self.server)}] 今日已签到")
                 return True
             elif self.check_response(response_data):
                 reward = self.safe_get_reward(response_data.get("data", 0))
                 if reward > 0:
-                    print(f"✅ [{self.server}] 签到成功 | 获得{reward}捷停币")
+                    print(f"✅ [{yyb_display(self.server)}] 签到成功 | 获得{reward}捷停币")
                 return True
             else:
-                print(f"❌ [{self.server}] 签到失败")
+                print(f"❌ [{yyb_display(self.server)}] 签到失败")
                 return False
         except Exception as e:
-            print(f"❌ [{self.server}] 签到异常 | 原因: {str(e)}")
+            print(f"❌ [{yyb_display(self.server)}] 签到异常 | 原因: {str(e)}")
             return False
 
     async def get_task_list(self):
@@ -893,7 +946,7 @@ class JtcBot:
 
             if self.check_response(response_data):
                 task_data = response_data.get("data", [])
-                print(f"✅ [{self.server}] 获取到{len(task_data)}个任务")
+                print(f"✅ [{yyb_display(self.server)}] 获取到{len(task_data)}个任务")
 
                 for task in task_data:
                     task_no = task.get("taskNo")
@@ -904,7 +957,7 @@ class JtcBot:
                 return task_data
             return []
         except Exception as e:
-            print(f"❌ [{self.server}] 获取任务列表失败 | 原因: {str(e)}")
+            print(f"❌ [{yyb_display(self.server)}] 获取任务列表失败 | 原因: {str(e)}")
             return []
 
     async def receive_task_reward(self, task_no, task_info=None):
@@ -935,11 +988,11 @@ class JtcBot:
             if self.check_response(response_data):
                 reward = self.safe_get_reward(response_data.get("data", 0))
                 if reward > 0:
-                    print(f"✅ [{self.server}] 领取【{show_title}】奖励 | +{reward}捷停币")
+                    print(f"✅ [{yyb_display(self.server)}] 领取【{show_title}】奖励 | +{reward}捷停币")
                 return reward
             return 0
         except Exception as e:
-            print(f"❌ [{self.server}] 领取【{show_title}】奖励失败 | 原因: {str(e)}")
+            print(f"❌ [{yyb_display(self.server)}] 领取【{show_title}】奖励失败 | 原因: {str(e)}")
             return 0
 
     async def simulate_task_action(self, task_no, task_info=None):
@@ -951,7 +1004,7 @@ class JtcBot:
         stay_seconds = max(self.task_browse_seconds.get(task_no, 10) - 2, 5)
 
         if task_no == "T01":  # 浏览找优惠
-            print(f"⏳ [{self.server}] 进入【找优惠】页面，停留{stay_seconds}秒...")
+            print(f"⏳ [{yyb_display(self.server)}] 进入【找优惠】页面，停留{stay_seconds}秒...")
             await self.send_data_report("PageView")
             await sleep(1000)
             await self.send_data_report("FindDiscountClick")
@@ -962,7 +1015,7 @@ class JtcBot:
             await sleep(500)
 
         elif task_no == "T47":  # 浏览车位优选（已更新为最新编号）
-            print(f"⏳ [{self.server}] 进入【车位优选】页面，停留{stay_seconds}秒...")
+            print(f"⏳ [{yyb_display(self.server)}] 进入【车位优选】页面，停留{stay_seconds}秒...")
             await self.send_data_report("PageView")
             await sleep(1000)
             await self.send_data_report("ParkingSpaceClick")
@@ -980,10 +1033,10 @@ class JtcBot:
         show_title = task_info.get("showTitle", "") if task_info else ""
 
         if task_info and task_info.get("taskStatus") == "DOWN":
-            print(f"ℹ️ [{self.server}] 【{show_title}】已完成，跳过执行")
+            print(f"ℹ️ [{yyb_display(self.server)}] 【{show_title}】已完成，跳过执行")
             return True
 
-        print(f"🔄 [{self.server}] 正在完成【{show_title}】")
+        print(f"🔄 [{yyb_display(self.server)}] 正在完成【{show_title}】")
 
         try:
             await self.simulate_task_action(task_no, task_info)
@@ -1018,13 +1071,13 @@ class JtcBot:
 
                 reward = self.safe_get_reward(response_data.get("data", 0))
                 if reward > 0:
-                    print(f"✅ [{self.server}] 完成【{show_title}】| +{reward}捷停币")
+                    print(f"✅ [{yyb_display(self.server)}] 完成【{show_title}】| +{reward}捷停币")
                 return True
             else:
-                print(f"❌ [{self.server}] 完成【{show_title}】失败")
+                print(f"❌ [{yyb_display(self.server)}] 完成【{show_title}】失败")
                 return False
         except Exception as e:
-            print(f"❌ [{self.server}] 完成【{show_title}】异常 | 原因: {str(e)}")
+            print(f"❌ [{yyb_display(self.server)}] 完成【{show_title}】异常 | 原因: {str(e)}")
             return False
 
     async def get_balance(self):
@@ -1041,7 +1094,7 @@ class JtcBot:
                 return response_data.get("data", {})
             return {}
         except Exception as e:
-            print(f"❌ [{self.server}] 获取余额失败 | 原因: {str(e)}")
+            print(f"❌ [{yyb_display(self.server)}] 获取余额失败 | 原因: {str(e)}")
             return {}
 
     async def run(self) -> Dict[str, Any]:
@@ -1060,7 +1113,7 @@ class JtcBot:
         }
 
         print(f"\n{'='*40}")
-        print(f"[{self.server}] 开始执行任务")
+        print(f"[{yyb_display(self.server)}] 开始执行任务")
         print(f"{'='*40}")
 
         try:
@@ -1092,7 +1145,7 @@ class JtcBot:
             user_info = await self.get_user_info()
             if user_info:
                 result["phone"] = self.format_phone(user_info.get("telephone", "未知"))
-                print(f"👤 [{self.server}] 用户: {result['phone']}")
+                print(f"👤 [{yyb_display(self.server)}] 用户: {result['phone']}")
 
             # 6. 执行签到
             sign_success = await self.perform_sign_in()
@@ -1113,7 +1166,7 @@ class JtcBot:
                     task_info_map[task_no] = task
 
                     if task_no in SKIP_TASKS:
-                        print(f"⏭️ [{self.server}] 跳过任务: {show_title}")
+                        print(f"⏭️ [{yyb_display(self.server)}] 跳过任务: {show_title}")
                         continue
 
                     if task_status == "RECEIVE":
@@ -1122,10 +1175,10 @@ class JtcBot:
                         incomplete_tasks.append((task_no, show_title))
 
             # 强制执行核心任务（即使不在任务列表中）
-            print(f"\n🔧 [{self.server}] 检查强制核心任务...")
+            print(f"\n🔧 [{yyb_display(self.server)}] 检查强制核心任务...")
             for task_no, show_title in FORCE_EXECUTE_TASKS:
                 if task_no not in task_info_map and task_no not in SKIP_TASKS:
-                    print(f"➕ [{self.server}] 添加强制任务: {show_title}")
+                    print(f"➕ [{yyb_display(self.server)}] 添加强制任务: {show_title}")
                     incomplete_tasks.append((task_no, show_title))
                     task_info_map[task_no] = {"taskNo": task_no, "showTitle": show_title, "taskStatus": "GOTO"}
 
@@ -1151,15 +1204,15 @@ class JtcBot:
             if balance_info:
                 result["balance"] = balance_info.get("accountAmt", 0)
                 result["deduct_amount"] = balance_info.get("deductAmount", 0)
-                print(f"💰 [{self.server}] 当前余额: {result['balance']}捷停币 | 可抵扣: {result['deduct_amount']}元")
+                print(f"💰 [{yyb_display(self.server)}] 当前余额: {result['balance']}捷停币 | 可抵扣: {result['deduct_amount']}元")
 
             result["success"] = True
             # 已删除：共获得0捷停币 相关输出
-            print(f"✅ [{self.server}] 任务执行完成")
+            print(f"✅ [{yyb_display(self.server)}] 任务执行完成")
 
         except Exception as e:
             result["error"] = str(e)
-            print(f"❌ [{self.server}] 执行异常 | 原因: {str(e)}")
+            print(f"❌ [{yyb_display(self.server)}] 执行异常 | 原因: {str(e)}")
 
         return result
 
