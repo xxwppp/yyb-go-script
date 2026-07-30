@@ -1,180 +1,75 @@
-// === YYB_GO 统一通知注入 begin ===
-(function () {
-  const __logs = [];
-  const __oL = console.log.bind(console);
-  console.log = function (...a) { try { __logs.push(a.map(x => (x && x.stack) ? x.stack : String(x)).join(' ')); } catch (e) {} __oL(...a); };
-  const __oE = console.error.bind(console);
-  console.error = function (...a) { try { __logs.push('[ERR] ' + a.map(x => (x && x.stack) ? x.stack : String(x)).join(' ')); } catch (e) {} __oE(...a); };
+/*
+ * # 当前脚本来自于 http://script.nnioj.com/ 脚本库下载！
+ * # 当前脚本来自于 http://script.nnioj.com/ 脚本库下载！
+ * # 当前脚本来自于 http://script.nnioj.com/ 脚本库下载！
+ * # 脚本库中的所有脚本文件均来自热心网友上传和互联网收集。
+ * # 脚本库仅提供文件上传和下载服务，不提供脚本文件的审核。
+ * # 您在使用脚本库下载的脚本时自行检查判断风险。
+ * # 所涉及到的 账号安全、数据泄露、设备故障、软件违规封禁、财产损失等问题及法律风险，与脚本库无关！均由开发者、上传者、使用者自行承担。
+ */
 
-  function __resolveKey() {
-    let k = process.env.QYWX_KEY || process.env.QYWX || process.env.WEWORK_KEY;
-    if (k) return k;
-    try {
-      const fs = require('fs');
-      let p = null;
-      try { p = require.resolve('./sendNotify'); } catch (e) { try { p = require.resolve('/ql/data/scripts/sendNotify'); } catch (e2) {} }
-      if (p) {
-        const t = fs.readFileSync(p, 'utf-8');
-        const m = t.match(/QYWX_KEY\s*=\s*['"]([^'"]+)['"]/);
-        if (m) return m[1];
-      }
-    } catch (e) {}
-    return null;
-  }
+/*
+------------------------------------------
+@Author: 适配修复完整版+随机UA池防风控 全局默认自动提现
+@Date: 2026.07.21
+@Description: 腾讯地图 签到领现金 + 余额查询 + 自动提现 全功能修复版
+cron: 18 8 * * *
+------------------------------------------
+环境变量配置说明：
+变量名：txdt
+所有账号默认开启自动提现，满15元自动提；
+JSON格式可自定义提现门槛：
+{"user_id":"123456789","remark":"主号","min_withdraw_amount":2000} 满20元提现
+不想提现单独关闭：{"user_id":"xxx","auto_withdraw":false}
+------------------------------------------
+*/
 
-  let __flushed = false;
-  function __flush() {
-    if (__flushed) return;
-    __flushed = true;
-    const title = (process.argv[1] || 'YYB_GO').split(/[\/]/).pop();
-    const body = __logs.slice(-40).join('\n');
-    // 1) 显式调用 sendNotify.js（满足要求）；临时静音其可能产生的报错，避免误导
-    const _ol = console.log, _oe = console.error;
-    console.log = function () {}; console.error = function () {};
-    try {
-      let sn;
-      try { sn = require('./sendNotify'); } catch (e) { try { sn = require('/ql/data/scripts/sendNotify'); } catch (e2) { sn = null; } }
-      if (sn) {
-        if (typeof sn === 'function') { try { sn(title, body); } catch (e) {} }
-        else if (sn.sendNotify && typeof sn.sendNotify === 'function') { try { sn.sendNotify(title, body); } catch (e) {} }
-      }
-    } catch (e) {}
-    console.log = _ol; console.error = _oe;
-    // 2) 兜底：同步 curl POST 企业微信机器人 webhook（绕过损坏的 sendNotify.js，确保送达）
-    try {
-      const key = __resolveKey();
-      if (key) {
-        const fs = require('fs');
-        const cp = require('child_process');
-        const tmp = '/tmp/yyb_notify_' + process.pid + '.json';
-        fs.writeFileSync(tmp, JSON.stringify({ msgtype: 'text', text: { content: '【' + title + '】\n' + body } }));
-        cp.execSync('curl -s -m 15 -X POST -H "Content-Type: application/json" --data @' + tmp + ' "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=' + key + '"', { stdio: 'ignore' });
-        try { fs.unlinkSync(tmp); } catch (e) {}
-      }
-    } catch (e) {}
-  }
+// 多UA池规避固定特征风控
+const USER_AGENT_LIST = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MicroMessenger/3.9.12 MiniProgramEnv/Windows WindowsWechat/WMPF",
+    "Mozilla/5.0 (Linux; Android 13; MI 13 Build/TKQ1.220829.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/142.0.7645.166 Mobile Safari/537.36 XWEB/1420097 MMWEBSDK/20251201 MMWEBID/2048 MicroMessenger/8.0.70.2660(0x28004638) WeChat/arm64 Weixin NetType/WIFI Language/zh_CN ABI/arm64",
+    "Mozilla/5.0 (Linux; Android 12; OPPO Find X6 Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7622.121 Mobile Safari/537.36 XWEB/1380156 MMWEBSDK/20251001 MMWEBID/3312 MicroMessenger/8.0.69.2520(0x28004532) WeChat/arm64 Weixin NetType/4G Language/zh_CN ABI/arm64",
+    "Mozilla/5.0 (Linux; Android 15; Pixel 9 Build/AP31.240905.013; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/148.0.7700.201 Mobile Safari/537.36 XWEB/1480032 MMWEBSDK/20260301 MMWEBID/789 MicroMessenger/8.0.72.3200(0x28004855) WeChat/arm64 Weixin NetType/WIFI Language/zh_CN ABI/arm64",
+    "Mozilla/5.0 (Linux; Android 11; HUAWEI Mate 40 Pro Build/HUAWEINOH-AN00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.6723.116 Mobile Safari/537.36 XWEB/1300211 MMWEBSDK/20250601 MMWEBID/1567 MicroMessenger/8.0.65.2200(0x28004130) WeChat/arm64 Weixin NetType/4G Language/zh_CN ABI/arm64"
+];
 
-  let __exiting = false;
-  const __origExit = (typeof process.exit === 'function') ? process.exit.bind(process) : function (c) { throw new Error('exit ' + c); };
-  process.exit = function (code) {
-    if (__exiting) return __origExit(code);
-    __exiting = true;
-    try { __flush(); } catch (e) {}
-    return __origExit(code);
-  };
-  process.on('beforeExit', () => { if (!__exiting) { __exiting = true; try { __flush(); } catch (e) {} } });
-})();
-// === YYB_GO 统一通知注入 end ===
-// === YYB 微信备注映射注入 begin ===
-const _NAME_MAP = {};
-const _raw_nm = process.env.YYB_NAME_MAP || "";
-_raw_nm.split(/[\n&]/).forEach(function (line) {
-  line = line.trim();
-  const idx = line.indexOf("=");
-  if (idx > 0) _NAME_MAP[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-});
-function yybDisplay(entry) {
-  if (!entry) return entry;
-  const ref = entry.indexOf("@") !== -1 ? entry.slice(entry.indexOf("@") + 1) : entry;
-  return _NAME_MAP[ref] !== undefined ? _NAME_MAP[ref] : entry;
+// 随机抽取UA
+function getRandomUA() {
+    const randomIdx = Math.floor(Math.random() * USER_AGENT_LIST.length);
+    return USER_AGENT_LIST[randomIdx];
 }
-// === YYB 微信备注映射注入 end ===
 
-
-// name: 腾讯地图
-// cron: 19 8 * * *
+// 青龙兼容工具封装
+const $ = {
+    name: "腾讯地图",
+    stat: { total: 0, success: 0, fail: 0, withdrawSuccess: 0, withdrawSkip: 0 },
+    log: (...args) => console.log(`[${$.name}] [INFO]`, ...args),
+    success: (...args) => console.log(`[${$.name}] [SUCC] ✅`, ...args),
+    error: (...args) => console.log(`[${$.name}] [ERR] ❌`, ...args),
+    wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+    done: () => console.log(`\n[${$.name}] ===== 全部任务执行完成 =====`)
+};
 
 const axios = require("axios");
-
-// === YYB 协议统一认证（自动 https + Basic/Bearer） begin ===
-(function () {
-    const token = process.env.YYB_TOKEN;
-    const user = process.env.YYB_USER;
-    const pass = process.env.YYB_PASS;
-    let yybAuth = null;
-    if (token) yybAuth = `Bearer ${token}`;
-    else if (user && pass) yybAuth = `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}`;
-    axios.interceptors.request.use(config => {
-        let url = config.url || '';
-        if (url.includes('/wxapp/getCode')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
-            if (yybAuth) {
-                config.headers = config.headers || {};
-                config.headers.Authorization = yybAuth;
-            }
-        }
-        return config;
-    });
-})();
-// === YYB 协议统一认证 end ===
-
 const crypto = require("crypto");
-// ====================== YYB Go 账号（环境变量 YYB_GO = 地址@微信账号标识，换行或&） ======================
-const SERVERS = (process.env.YYB_GO || "")
-    .split(/\r?\n|&/)
-    .map(s => s.trim())
-    .filter(Boolean);
-if (!SERVERS.length) {
-    console.error("未配置环境变量 YYB_GO，请设置后重试（格式：地址@微信账号标识，换行或&）");
-    process.exit(1);
-}
-function parseYybGoEntry(rawValue) {
-    const value = String(rawValue || "").trim();
-    if (!value) return { server: "", ref: "" };
-    const atIndex = value.indexOf("@");
-    if (atIndex === -1) {
-        console.log("YYB_GO 格式应为 地址@微信账号标识，当前值: " + value);
-        return { server: "", ref: "" };
-    }
-    let server = value.slice(0, atIndex).trim();
-    const ref = value.slice(atIndex + 1).trim();
-    if (server.startsWith("http://")) server = server.slice(7);
-    else if (server.startsWith("https://")) server = server.slice(8);
-    server = server.replace(/\/+$/, "");
-    if (!server || !ref) return { server: "", ref: "" };
-    return { server, ref };
-}
-function buildYybAuthHeaders() {
-    const token = process.env.YYB_TOKEN;
-    if (token) return { Authorization: `Bearer ${token}` };
-    const user = process.env.YYB_USER;
-    const pass = process.env.YYB_PASS;
-    if (user && pass) return { Authorization: `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}` };
-    return {};
-}
-async function getCode(server) {
-    const { server: parsedServer, ref } = parseYybGoEntry(server);
-    if (!parsedServer || !ref) return null;
-    const url = "https://" + parsedServer + "/wxapp/getCode";
-    try {
-        const { data } = await axios.post(url, { ref, app_id: 'wx7643d5f831302ab0' }, { timeout: 20000, proxy: false });
-        const code = data && data.data && data.data.result && data.data.result.code;
-        if (!data || data.code !== 0 || !code) {
-            console.log(parsedServer + " 获取code失败: " + JSON.stringify(data));
-            return null;
-        }
-        console.log(parsedServer + " 获取code成功");
-        return code;
-    } catch (e) {
-        console.log(parsedServer + " 获取code异常: " + e.message);
-        return null;
-    }
-}
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-let userIdx = 1;
 
-const APP = { name: "腾讯地图", appid: "wx7643d5f831302ab0", version: 545 };
-
-const MINI_LOGIN_BASE = "https://miniapp.map.qq.com";
+const CK_NAME = "txdt";
+const APP = { 
+    name: "腾讯地图", 
+    appid: "wx7643d5f831302ab0", 
+    version: 545,
+    withdrawGameId: 4,
+    withdrawRuleId: "tencent_map_withdraw",
+    checkinGameId: 1,
+    checkinRuleId: "tencent_map_checkin",
+    defaultMinWithdrawThreshold: 1500
+};
 const MAP_BASE = "https://mmapgwh.map.qq.com";
-const LOGIN_ACCESS_KEY = "1";
-const LOGIN_SECRET_KEY = "4300eec60bedec22a73408a0d76b03ec";
 const TMAP_SECRET = "3a9875e795c3ecff15f617085e72d4cc";
 const CHECKIN_TOKEN = "e643d512f085d621bf6c9e80310d0498";
 const ACTIVITY_ID = 1721983577;
-const USER_AGENT =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MicroMessenger/3.9.12 MiniProgramEnv/Windows WindowsWechat/WMPF";
 
+// 工具函数
 function splitAccounts(value = "") {
     return String(value)
         .split(/\n|&/)
@@ -203,84 +98,72 @@ function uuid() {
     });
 }
 
-function sortedQuery(data) {
-    const normalized = {};
-    Object.keys(data)
-        .sort()
-        .forEach((key) => {
-            if (data[key] !== undefined && data[key] !== null) normalized[key] = data[key];
-        });
-    return Object.keys(normalized)
-        .map((key) => `${key}=${normalized[key]}`)
-        .join("&");
+// 随机微信昵称，规避固定昵称风控
+function randomNick() {
+    const suffix = Math.floor(Math.random() * 9999);
+    return `微信用户${suffix}`;
 }
 
 function formatCoin(value) {
     const num = Number(value || 0);
-    return `${num}(${(num / 100).toFixed(2)})`;
+    return `${num}分(¥${(num / 100).toFixed(2)})`;
 }
 
 function parseAccount(raw) {
     const text = String(raw || "").trim();
     if (!text) return {};
     if (text.startsWith("{")) {
-        const data = JSON.parse(text);
-        return { raw: text, openid: data.openid || data.openId || "", remark: data.remark || data.name || "" };
+        try {
+            const data = JSON.parse(text);
+            return {
+                raw: text,
+                user_id: String(data.user_id || data.userid || ""),
+                remark: data.remark || data.name || "",
+                auto_withdraw: data.auto_withdraw !== false, // JSON不写false就开启提现
+                min_withdraw_amount: Number(data.min_withdraw_amount || APP.defaultMinWithdrawThreshold)
+            };
+        } catch (err) {
+            $.error(`账号JSON解析失败 ${raw}：${err.message}`);
+            return {};
+        }
     }
-    const [openid, remark] = text.split("#").map((item) => item.trim());
-    return { raw: text, openid, remark };
-}
-
-async function request(options) {
-    const res = await axios.request({
-        timeout: 20000,
-        validateStatus: () => true,
-        ...options,
-        headers: {
-            "User-Agent": USER_AGENT,
-            Accept: "application/json, text/plain, */*",
-            Referer: `https://servicewechat.com/${APP.appid}/${APP.version}/page-frame.html`,
-            ...(options.headers || {}),
-        },
-    });
-    return { status: res.status, headers: res.headers || {}, data: res.data };
-}
-
-async function getWxCode(server) {
-        return await getCode(server);
-    }
-
-
-function loginSign({ appId, sessionId = "-1", openId, userId, postBody }) {
-    const reqId = md5(`${Math.random()} ${Date.now()}`);
-    const reqTime = Date.now().toString().slice(0, 10);
-    const signParams = {
-        appId,
-        reqId,
-        reqTime,
-        userId,
-        openID: openId,
-        sessionID: sessionId,
-        accessKey: LOGIN_ACCESS_KEY,
-        businessStr: JSON.stringify(postBody),
+    // 核心修改：普通ID格式默认开启自动提现 true
+    const [user_id, remark] = text.split("#").map((item) => item.trim());
+    return {
+        raw: text,
+        user_id: String(user_id),
+        remark: remark || "未备注账号",
+        auto_withdraw: true, // 所有纯ID账号默认自动提现
+        min_withdraw_amount: APP.defaultMinWithdrawThreshold
     };
-    const signText = `${sortedQuery(signParams)}&secretKey=${LOGIN_SECRET_KEY}`;
-    const headers = {
-        "mapservice-sign-version": "v2",
-        "mapservice-sign": sha256(signText),
-        "mapservice-reqid": reqId,
-        "mapservice-reqtime": reqTime,
-        "mapservice-appid": appId,
-        "mapservice-accesskey": LOGIN_ACCESS_KEY,
-        "mapservice-sessionid": sessionId,
-    };
-    if (sessionId && sessionId !== "-1") {
-        headers["mapservice-openid"] = openId;
-        headers["mapservice-userid"] = userId;
-    }
-    return headers;
 }
 
+// 请求封装，随机UA、自动重试
+async function request(options, retry = 2) {
+    try {
+        const res = await axios.request({
+            timeout: 20000,
+            validateStatus: () => true,
+            ...options,
+            headers: {
+                "User-Agent": getRandomUA(),
+                Accept: "application/json, text/plain, */*",
+                Referer: `https://servicewechat.com/${APP.appid}/${APP.version}/page-frame.html`,
+                ...(options.headers || {}),
+            },
+        });
+        return { status: res.status, headers: res.headers || {}, data: res.data };
+    } catch (e) {
+        if (retry > 0) {
+            $.log(`请求失败，1秒后重试，剩余重试次数：${retry - 1}`);
+            await $.wait(1000);
+            return request(options, retry - 1);
+        }
+        throw new Error(`网络请求异常: ${e.message}`);
+    }
+}
+
+// 签名生成逻辑
 function mapH5Sign(apiPath, user) {
     const reqId = uuid();
     const reqTime = Date.now();
@@ -290,22 +173,22 @@ function mapH5Sign(apiPath, user) {
     const headers = {
         "tmap-reqid": reqId,
         "tmap-reqtime": reqTime,
-        "tmap-userid": Number(user.user_id) || Number(user.userId) || 0,
-        "tmap-login-ssid": user.session_id || user.sessionId || 0,
+        "tmap-userid": Number(user.user_id) || 0,
+        "tmap-login-ssid": user.session_id || 0,
         "tmap-imei": 0,
         "tmap-qimei": 0,
         "tmap-qimei36": 0,
         "tmap-nonce": 0,
         "tmap-install-id": 0,
-        "tmap-sign": 0,
+        "tmap-sign": defaultSign,
         "tmap-default-sign": defaultSign,
         "tmap-app-version": 0,
         "tmap-channel": 0,
         "tmap-engine": "web",
-        "tmap-mini-login-ssid": user.map_session_id || user.mapSessionId || "",
-        "tmap-app-id": user.appId || APP.appid,
+        "tmap-mini-login-ssid": user.map_session_id || "",
+        "tmap-app-id": APP.appid,
     };
-    if (user.openid || user.openId) headers["tmap-openid"] = user.openid || user.openId;
+    if (user.user_id) headers["tmap-openid"] = user.user_id;
     return headers;
 }
 
@@ -314,7 +197,7 @@ function checkinHeader(user) {
     const timestamp = Math.floor(Date.now() / 1000);
     const signText = `request_id=${requestId}&from_source=${APP.appid}&timestamp=${timestamp}&token=${CHECKIN_TOKEN}`;
     return {
-        user_id: user.openid || user.openId,
+        user_id: user.user_id,
         from_source: APP.appid,
         request_id: requestId,
         timestamp,
@@ -322,70 +205,13 @@ function checkinHeader(user) {
     };
 }
 
+// 核心任务类
 class TencentMap {
     constructor(rawAccount, index) {
-        this.server = rawAccount;
-        const _yyb = parseYybGoEntry(this.server);
-        this.ref = _yyb.ref;
-        this.openid = _yyb.ref;
         this.index = index;
         this.account = parseAccount(rawAccount);
         this.loginInfo = {};
         this.userInfo = {};
-    }
-
-    async miniLogin() {
-        const code = await getWxCode(this.server);
-        const body = {
-            seqid: uuid(),
-            app_id: APP.appid,
-            auth_code: code,
-            devHeader: {},
-        };
-        const { status, data } = await request({
-            method: "POST",
-            url: `${MINI_LOGIN_BASE}/minLogin/v2/login`,
-            headers: {
-                "content-type": "application/json",
-                ...loginSign({ appId: APP.appid, postBody: body }),
-            },
-            data: body,
-        });
-        if (status !== 200 || Number(data?.err_code) !== 0) throw new Error(`登录失败 HTTP ${status}: ${short(data)}`);
-        this.loginInfo = { ...data, appId: APP.appid };
-        console.log(`登录：成功 userId=${data.user_id || "未知"}，openid=${data.openid || "未知"}`);
-    }
-
-    async queryUser() {
-        const user = this.loginInfo;
-        const body = {
-            seqid: uuid(),
-            app_id: APP.appid,
-            userId: user.user_id,
-            openId: user.openid,
-            source: "mini-tencentmap",
-        };
-        const { status, data } = await request({
-            method: "POST",
-            url: `${MINI_LOGIN_BASE}/minLogin/v2/getUserInfo`,
-            headers: {
-                "content-type": "application/json",
-                ...loginSign({
-                    appId: APP.appid,
-                    sessionId: user.session_id,
-                    userId: user.user_id,
-                    openId: user.openid,
-                    postBody: body,
-                }),
-            },
-            data: body,
-        });
-        if (status !== 200 || Number(data?.err_code) !== 0) {
-            console.log(`用户信息：查询失败 HTTP ${status}: ${short(data)}`);
-            return;
-        }
-        this.userInfo = data || {};
-        console.log(`用户信息：${data.nickname || "微信用户"}，userId=${data.userid || user.user_id}`);
     }
 
     async mapApi(apiPath, data) {
@@ -393,32 +219,37 @@ class TencentMap {
             method: "POST",
             url: `${MAP_BASE}${apiPath}`,
             headers: {
-                "content-type": "application/json",
+                "content-type": "application/json;charset=utf-8",
                 ...checkinHeader(this.loginInfo),
                 ...mapH5Sign(apiPath, this.loginInfo),
             },
             data,
         });
-        if (status !== 200 || Number(body?.code) !== 0) throw new Error(`${apiPath} HTTP ${status}: ${short(body)}`);
+        if (status !== 200) throw new Error(`HTTP状态码${status}`);
+        const code = Number(body?.code ?? -1);
+        if (code !== 0) throw new Error(`接口返回错误 code:${code} msg:${body?.msg || short(body)}`);
         return body.data || {};
     }
 
     async queryBalance(prefix = "现金余额") {
         const data = await this.mapApi("/activity/v1/withdraw/home", {
             activity_id: ACTIVITY_ID,
-            game_id: 4,
-            rule_id: "tencent_map_withdraw",
+            game_id: APP.withdrawGameId,
+            rule_id: APP.withdrawRuleId,
         });
-        console.log(
-            `${prefix}：金币=${formatCoin(data.coins)}，可提现=${formatCoin(data.withdrawable_amount)}，门槛=${formatCoin(data.current_withdraw_threshold)}，奖池=${formatCoin(data.jackpot_amount)}`
+        const coins = Number(data.coins || 0);
+        const withdrawable = Number(data.withdrawable_amount || 0);
+        const threshold = Number(data.current_withdraw_threshold || APP.defaultMinWithdrawThreshold);
+        $.log(
+            `${prefix}：金币=${formatCoin(coins)}，可提现=${formatCoin(withdrawable)}，最低提现门槛=${formatCoin(threshold)}`
         );
         return data;
     }
 
     async queryAssets() {
         const data = await this.mapApi("/activity/v1/assert/home", { activity_id: ACTIVITY_ID });
-        console.log(
-            `资产信息：金币=${formatCoin(data.coins)}，优惠券=${data.coupons_total || 0}，抽奖券=${data.lottery_ticket_total || 0}`
+        $.log(
+            `资产信息：金币=${formatCoin(data.coins || 0)}，优惠券=${data.coupons_total || 0}张，抽奖券=${data.lottery_ticket_total || 0}张`
         );
         return data;
     }
@@ -434,66 +265,124 @@ class TencentMap {
     async queryCalendar(prefix = "签到状态") {
         const data = await this.mapApi("/activity/v1/checkin/calendar", {
             activity_id: ACTIVITY_ID,
-            game_id: 1,
-            rule_id: "tencent_map_checkin",
+            game_id: APP.checkinGameId,
+            rule_id: APP.checkinRuleId,
         });
-        const today = data.calendar?.[this.todayKey()] || {};
-        const prizes = Array.isArray(today.prizes)
-            ? today.prizes.map((item) => `${item.name || item.type || "奖励"}:${item.amount ?? ""}`).join("，")
-            : "";
-        console.log(`${prefix}：今日${today.checkin ? "已签" : "未签"}，周期已签=${data.checkin_days || 0}/${data.period || 0}${prizes ? `，奖励=${prizes}` : ""}`);
-        return { data, today };
+        const todayData = data.calendar?.[this.todayKey()] || {};
+        const todaySigned = !!todayData.checkin;
+        let prizeText = "";
+        if (Array.isArray(todayData.prizes) && todayData.prizes.length) {
+            prizeText = todayData.prizes.map((item) => `${item.name || item.type}:${item.amount ?? ""}`).join("，");
+        }
+        $.log(`${prefix}：今日${todaySigned ? "已签到" : "未签到"}，周期累计签到${data.checkin_days || 0}/${data.period || 0}天${prizeText ? `，今日奖励=${prizeText}` : ""}`);
+        return { data, today: todayData };
     }
 
     async checkin() {
-        const { today } = await this.queryCalendar("签到前");
+        const { today } = await this.queryCalendar("签到前校验");
         if (today.checkin) {
-            console.log("签到：今日已签到");
+            $.log("今日已完成签到，跳过重复操作");
             return;
         }
         const data = await this.mapApi("/activity/v1/checkin", {
             activity_id: ACTIVITY_ID,
-            game_id: 1,
-            rule_id: "tencent_map_checkin",
-            nick: this.userInfo.nickname || "微信用户",
+            game_id: APP.checkinGameId,
+            rule_id: APP.checkinRuleId,
+            nick: randomNick(),
         });
-        const prizes = Array.isArray(data.prizes)
-            ? data.prizes.map((item) => `${item.name || item.type || "奖励"}:${item.amount ?? ""}`).join("，")
-            : short(data);
-        console.log(`签到：成功${prizes ? `，${prizes}` : ""}`);
+        let prizeText = "";
+        if (Array.isArray(data.prizes) && data.prizes.length) {
+            prizeText = data.prizes.map((item) => `${item.name || item.type}:${item.amount ?? ""}`).join("，");
+        }
+        $.success(`签到执行成功${prizeText ? `，获得奖励：${prizeText}` : ""}`);
+        $.stat.success += 1;
+    }
+
+    async autoWithdraw() {
+        if (!this.account.auto_withdraw) {
+            $.log("该账号已手动关闭自动提现，跳过提现流程");
+            return;
+        }
+        $.log("开始执行自动提现校验");
+        const balanceData = await this.queryBalance("提现前余额校验");
+        const withdrawable = Number(balanceData.withdrawable_amount || 0);
+        const currentThreshold = Number(balanceData.current_withdraw_threshold || APP.defaultMinWithdrawThreshold);
+        const triggerAmount = Math.max(this.account.min_withdraw_amount, currentThreshold);
+        if (withdrawable < triggerAmount) {
+            $.log(`当前可提现金额${formatCoin(withdrawable)}未达到${formatCoin(triggerAmount)}自动提现阈值，暂不发起提现`);
+            $.stat.withdrawSkip += 1;
+            return;
+        }
+        const validItems = (balanceData.withdraw_items || []).filter(item => {
+            return Number(item.amount) > 0 && item.status === 0;
+        });
+        if (!validItems.length) {
+            $.error("未找到任何可发起的有效提现档位，跳过本次提现");
+            return;
+        }
+        let targetItem = validItems.find(i => Number(i.amount) === triggerAmount);
+        if (!targetItem) {
+            targetItem = validItems.sort((a, b) => Number(a.amount) - Number(b.amount))[0];
+        }
+        const withdrawRes = await this.mapApi("/activity/v1/withdraw/apply", {
+            activity_id: ACTIVITY_ID,
+            game_id: APP.withdrawGameId,
+            rule_id: APP.withdrawRuleId,
+            amount: targetItem.amount,
+            withdraw_item_id: targetItem.id,
+            pay_channel: 1
+        });
+        $.success(`提现申请提交成功，提现金额${formatCoin(targetItem.amount)}，申请单号：${withdrawRes.order_id || "无"}`);
+        $.stat.withdrawSuccess += 1;
     }
 
     async run() {
-        console.log(`\n========== ${APP.name} 账号[${this.index}] ${this.account.remark || this.openid} ==========`);
-        await this.miniLogin();
-        await this.queryUser();
+        const mark = this.account.remark || this.account.user_id;
+        $.log(`\n========== 账号[${this.index}] ${mark} ==========`);
+        this.loginInfo = {
+            user_id: this.account.user_id,
+            session_id: 0,
+            map_session_id: "",
+        };
         await this.queryBalance("签到前现金余额");
         await this.queryAssets();
         await this.checkin();
+        await this.autoWithdraw();
         await this.queryBalance("签到后现金余额");
-        await this.queryCalendar("签到后");
+        await this.queryCalendar("签到后状态");
     }
 }
 
+// 主执行入口
 (async () => {
-    const accounts = SERVERS;
+    const envRaw = process.env[CK_NAME] || process.env.tencentmap || "";
+    const accounts = splitAccounts(envRaw);
     if (!accounts.length) {
-        console.log(`未配置 YYB_GO`);
-        
+        $.error(`未检测到环境变量 ${CK_NAME} 请配置账号信息`);
+        await $.done();
         return;
     }
-    console.log(`共找到${accounts.length}个账号`);
+    $.stat.total = accounts.length;
+    $.log(`共检测到${accounts.length}个待执行账号，全部默认开启自动提现`);
     for (let i = 0; i < accounts.length; i++) {
         const runner = new TencentMap(accounts[i], i + 1);
         try {
             await runner.run();
         } catch (e) {
-            console.log(`账号[${i + 1}] 执行失败：${e.message || e}`);
+            $.error(`账号[${i + 1}] 执行失败：${e.message || e}`);
+            $.stat.fail += 1;
         }
-        await await sleep(800);
+        const randomWait = Math.floor(Math.random() * 700) + 800;
+        await $.wait(randomWait);
     }
-    
+    $.log(`\n===== 脚本最终运行统计 =====`);
+    $.log(`总账号数：${$.stat.total}`);
+    $.log(`签到成功数：${$.stat.success}`);
+    $.log(`执行失败数：${$.stat.fail}`);
+    $.log(`提现成功数：${$.stat.withdrawSuccess}`);
+    $.log(`跳过提现数：${$.stat.withdrawSkip}`);
+    await $.done();
 })().catch(async (e) => {
-    console.log(`脚本异常：${e.stack || e.message || e}`);
-    
+    $.error(`脚本全局致命异常：${e.stack || e.message}`);
+    await $.done();
 });
