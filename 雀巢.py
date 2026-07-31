@@ -137,8 +137,8 @@ except Exception:
 # └───────────────┴──────────┴─────────────────────────────────────┘
 #
 # YYB_NAME_MAP示例值（每行一个，openid=备注）：
-# owNAX6rgZe4o2XM4F_udpf1hhVaE=w0390
-# owNAX6vC5tBOEBnNct9vfbdPRRKU=甜梦甜
+# oXXXXXXXXXXXXXXXXXXXXXXXXXXX=账号备注1
+# oYYYYYYYYYYYYYYYYYYYYYYYYYYY=账号备注2
 #
 # YYB_GO示例值（换行或&分隔）：
 # 127.0.0.1:8088
@@ -233,8 +233,8 @@ if env_YYB_GO:
     raw_lines = env_YYB_GO.replace("&", "\n").splitlines()
     SERVERS = [line.strip() for line in raw_lines if line.strip()]
 
-# 微信备注映射：让日志显示 w0390/甜梦甜 而不是 yyb.xxxxx@openid
-# 格式：每行 openid=备注，或 & 分隔；示例：owNAX6...=w0390
+# 微信备注映射：让日志显示自定义备注而不是 yyb.xxxxx@openid
+# 格式：每行 openid=备注，或 & 分隔；示例：oXXXXXXXX...=账号备注
 NAME_MAP = {}
 _name_map_raw = os.getenv("YYB_NAME_MAP", "") or ""
 for line in _name_map_raw.replace("&", "\n").splitlines():

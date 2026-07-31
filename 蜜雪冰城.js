@@ -254,7 +254,7 @@ async function getCode(server) {
     
     try {
         const { data } = await axios.post("http://" + addr + "/wxapp/getCode", {
-            ref: ref || "owNAX6gQdCIdZKWsm2c6adr7_eZY",
+            ref: ref,
             app_id: appId
         }, { timeout: 20000, proxy: false });
         const code = data?.data?.result?.code;

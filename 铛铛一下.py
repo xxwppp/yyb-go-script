@@ -106,8 +106,6 @@ def yyb_display(entry):
   PLUSPLUS_TOKEN    PushPlus token，可选
   PROXY_API         品赞代理提取 API，可选
   PROXY_TYPE        http / socks5，默认 http
-  PROXY_USER        品赞账号密码模式的用户名（移动大内网无公网 IP 时用），可选
-  PROXY_PASS        品赞账号密码模式的密码，可选
   DD1X_CHANNEL_ID   渠道 ID，默认 154
 
 依赖：
@@ -183,9 +181,6 @@ CHANNEL_ID = os.getenv("DD1X_CHANNEL_ID", "154")
 PLUSPLUS_TOKEN = os.getenv("PLUSPLUS_TOKEN", "")
 PROXY_API = os.getenv("PROXY_API", "")
 PROXY_TYPE = os.getenv("PROXY_TYPE", "http").lower()
-# 账号密码模式（移动大内网无公网 IP、白名单不可用时，从环境变量兜底注入代理账密）
-PROXY_USER = os.getenv("PROXY_USER", "")
-PROXY_PASS = os.getenv("PROXY_PASS", "")
 
 PROXY_RETRY_TIMES = 3
 PROXY_VALIDATE_URL = "http://httpbin.org/ip"
@@ -318,9 +313,8 @@ def build_proxy_dict(proxy_info: Dict[str, Any] | None) -> Dict[str, str] | None
 
     host = proxy_info["host"]
     port = proxy_info["port"]
-    # 账号密码模式：移动大内网无公网 IP，白名单不可用，从环境变量兜底注入
-    username = proxy_info.get("username", "") or os.getenv("PROXY_USER", "")
-    password = proxy_info.get("password", "") or os.getenv("PROXY_PASS", "")
+    username = proxy_info.get("username", "")
+    password = proxy_info.get("password", "")
 
     auth = ""
     if username and password:
@@ -579,10 +573,7 @@ def api_get(server: str, url: str, token: str, proxies: Dict[str, str] | None) -
         server=server,
     )
     try:
-        data = response.json()
-        if not isinstance(data, dict):
-            return {"code": -1, "msg": f"响应非JSON对象: {str(data)[:300]}"}
-        return data
+        return response.json()
     except Exception:
         return {
             "code": -1,
@@ -600,10 +591,7 @@ def api_post(server: str, url: str, token: str, proxies: Dict[str, str] | None, 
         server=server,
     )
     try:
-        data = response.json()
-        if not isinstance(data, dict):
-            return {"code": -1, "msg": f"响应非JSON对象: {str(data)[:300]}"}
-        return data
+        return response.json()
     except Exception:
         return {
             "code": -1,
@@ -705,19 +693,15 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
     try:
         sign_resp = api_get(server, SIGN_JOIN_URL, token, proxies)
         if sign_resp.get("code") == 0:
-            sign_data = sign_resp.get("data") or {}
-            sign_name = sign_data.get("name", "签到成功")
+            sign_name = sign_resp.get("data", {}).get("name", "签到成功")
             result["signMsg"] = f"每日签到: {sign_name}"
             print(f"✅ [签到] {result['signMsg']}")
         else:
             result["signMsg"] = sign_resp.get("msg") or sign_resp.get("message") or "签到失败"
             print(f"⚠️ [签到] {result['signMsg']}")
 
-        lottery_info = api_get(server, LOTTERY_INFO_URL, token, proxies) or {}
-        lottery_data = lottery_info.get("data") or {}
-        if not lottery_info.get("data"):
-            print(f"⚠️ [抽奖] lottery_info 返回 data 为空: {json_preview(lottery_info)}")
-        member_count = int(lottery_data.get("member_count", 0) or 0)
+        lottery_info = api_get(server, LOTTERY_INFO_URL, token, proxies)
+        member_count = int(lottery_info.get("data", {}).get("member_count", 0) or 0)
         print(f"🎰 [抽奖] 当前可抽奖 {member_count} 次")
 
         prize_list: List[str] = []
@@ -749,11 +733,8 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
 
         result["lotteryMsg"] = "、".join(prize_list) if prize_list else f"{member_count} 次机会"
 
-        account_resp = api_get(server, ACCOUNT_DETAIL_URL, token, proxies) or {}
-        account_data = account_resp.get("data") or {}
-        if not account_resp.get("data"):
-            print(f"⚠️ [余额] account_detail 返回 data 为空: {json_preview(account_resp)}")
-        total_raw = account_data.get("total", 0)
+        account_resp = api_get(server, ACCOUNT_DETAIL_URL, token, proxies)
+        total_raw = account_resp.get("data", {}).get("total", 0)
         total = to_float(total_raw)
 
         result["balance"] = str(total_raw)
