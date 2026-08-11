@@ -102,7 +102,7 @@ function getCommonHeaders() {
 function getWxCode(server, ref) {
     return new Promise((resolve) => {
         $.post({
-            url: `https://${server}/wxapp/getCode`,
+            url: `http://${server}/wxapp/getCode`,
             json: { app_id: WARHORSE_APP_ID, ref: String(ref) },
             headers: Object.assign({ 'content-type': 'application/json' }, buildYybAuthHeaders())
         }, (err, resp, data) => {
@@ -118,7 +118,7 @@ function getWxCode(server, ref) {
 function getPhoneEncrypted(server, ref) {
     return new Promise((resolve) => {
         $.post({
-            url: `https://${server}/wxapp/getPhoneNumber`,
+            url: `http://${server}/wxapp/getPhoneNumber`,
             json: { app_id: WARHORSE_APP_ID, ref: String(ref) },
             headers: Object.assign({ 'content-type': 'application/json' }, buildYybAuthHeaders())
         }, (err, resp, data) => {

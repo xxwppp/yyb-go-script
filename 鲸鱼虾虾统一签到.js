@@ -68,7 +68,7 @@ function yybDisplay(entry) {
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/getCode')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) { config.headers = config.headers || {}; config.headers.Authorization = yybAuth; }
         }
         return config;
@@ -368,7 +368,7 @@ class AppContext {
 
     async getCode(entry) {
     const { server, openid } = parseYybGoEntry(entry);
-    const { data } = await axios.post(`https://${server}/wxapp/getCode`, { ref: openid, app_id: this.app.appid }, { timeout: 15000, validateStatus: () => true });
+    const { data } = await axios.post(`http://${server}/wxapp/getCode`, { ref: openid, app_id: this.app.appid }, { timeout: 15000, validateStatus: () => true });
     const code = data?.code || data?.data?.code;
     if (!code) throw new Error(`YYB_GO 未返回 code: ${JSON.stringify(data)}`);
     return code;

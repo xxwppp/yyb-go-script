@@ -105,7 +105,7 @@ const crypto = require("crypto");
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/getCode')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = yybAuth;
@@ -247,7 +247,7 @@ async function getWxCode(entry) {
   console.log(`[${yybDisplay(entry)}] 请求 YYB Go 获取 code`);
   const { status, data } = await request({
     method: "POST",
-    url: `https://${server}/wxapp/getCode`,
+    url: `http://${server}/wxapp/getCode`,
     data: { ref, app_id: MINI_APP_ID },
   });
   const code = data?.data?.result?.code || data?.data?.code || data?.code;

@@ -95,7 +95,7 @@ def normalize_server(server: str) -> str:
         return ""
     if server.startswith("http://") or server.startswith("https://"):
         return server
-    return f"https://{server}"
+    return f"http://{server}"
 
 
 def json_or_text(response: requests.Response) -> Any:

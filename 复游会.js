@@ -95,7 +95,7 @@ const path = require("path");
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/getCode') || url.includes('/wxapp/operateWxData') || url.includes('/wxapp/getPhoneNumber')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = yybAuth;
@@ -157,7 +157,7 @@ const wechat = {
   appid: MINI_APP_ID,
   async getCode(entry) {
     const { server, openid } = parseYybGoEntry(entry);
-    const { data } = await axios.post(`https://${server}/wxapp/getCode`, { ref: openid, app_id: MINI_APP_ID }, { timeout: 15000, validateStatus: () => true });
+    const { data } = await axios.post(`http://${server}/wxapp/getCode`, { ref: openid, app_id: MINI_APP_ID }, { timeout: 15000, validateStatus: () => true });
     const code = data && (data.code || (data.data && data.data.code));
     if (!code) throw new Error('YYB_GO 获取 code 失败: ' + JSON.stringify(data));
     return { data: { status: true, code: code, data: { code: code } } };
@@ -165,11 +165,11 @@ const wechat = {
   async getuserinfo(entry) {
     const { server, openid } = parseYybGoEntry(entry);
     // 1) wx login code
-    const { data: c } = await axios.post(`https://${server}/wxapp/getCode`, { ref: openid, app_id: MINI_APP_ID }, { timeout: 15000, validateStatus: () => true });
+    const { data: c } = await axios.post(`http://${server}/wxapp/getCode`, { ref: openid, app_id: MINI_APP_ID }, { timeout: 15000, validateStatus: () => true });
     const code = c && (c.code || (c.data && c.data.code));
     if (!code) throw new Error('YYB_GO 获取 code 失败: ' + JSON.stringify(c));
     // 2) encryptedData / iv via operateWxData(getUserInfo)
-    const { data: u } = await axios.post(`https://${server}/wxapp/operateWxData`, {
+    const { data: u } = await axios.post(`http://${server}/wxapp/operateWxData`, {
       ref: openid, app_id: MINI_APP_ID,
       payload: { api_name: "getUserInfo", data: {}, env: 1 },
     }, { timeout: 45000, validateStatus: () => true });
@@ -181,7 +181,7 @@ const wechat = {
   },
   async getphonenumber(entry) {
     const { server, openid } = parseYybGoEntry(entry);
-    const { data } = await axios.post(`https://${server}/wxapp/getPhoneNumber`, { ref: openid, app_id: MINI_APP_ID }, { timeout: 60000, validateStatus: () => true });
+    const { data } = await axios.post(`http://${server}/wxapp/getPhoneNumber`, { ref: openid, app_id: MINI_APP_ID }, { timeout: 60000, validateStatus: () => true });
     const code = data && data.data && data.data.result && data.data.result.code;
     if (!code) throw new Error('YYB_GO 获取手机号 code 失败: ' + JSON.stringify(data));
     return { data: { status: true, code: code, data: { code: code } } };

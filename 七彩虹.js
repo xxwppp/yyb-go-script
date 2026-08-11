@@ -29,7 +29,7 @@ const axios = require("axios");
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = yybAuth;

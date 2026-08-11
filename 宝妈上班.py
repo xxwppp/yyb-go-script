@@ -150,8 +150,6 @@ if _yyb_auth:
     _orig_requests_post = requests.post
     def _yyb_requests_post(url, *args, **kwargs):
         if isinstance(url, str) and "/wxapp/getCode" in url:
-            if url.startswith("http://"):
-                url = url.replace("http://", "https://", 1)
             kwargs.setdefault("headers", {})
             kwargs["headers"]["Authorization"] = _yyb_auth
         return _orig_requests_post(url, *args, **kwargs)
@@ -221,7 +219,7 @@ def get_yyb_go_code(entry):
         print(f"  [YYB_GO] 无效 entry: {entry}")
         return None
     try:
-        url = f"https://{server}/wxapp/getCode"
+        url = f"http://{server}/wxapp/getCode"
         r = requests.post(url, json={"ref": ref, "app_id": TARGET_APPID}, timeout=20).json()
         code = r.get("data", {}).get("result", {}).get("code")
         if r.get("code") != 0 or not code:

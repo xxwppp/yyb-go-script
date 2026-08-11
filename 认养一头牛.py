@@ -63,8 +63,6 @@ if _yyb_auth:
     _orig_requests_post = requests.post
     def _yyb_requests_post(url, *args, **kwargs):
         if isinstance(url, str) and "/wxapp/" in url:
-            if url.startswith("http://"):
-                url = url.replace("http://", "https://", 1)
             kwargs.setdefault("headers", {})
             kwargs["headers"]["Authorization"] = _yyb_auth
         return _orig_requests_post(url, *args, **kwargs)
@@ -237,7 +235,7 @@ def refresh_token(server: str, ref: str) -> str | None:
     try:
         # 1. 获取 wx.login code
         code_resp = requests.post(
-            f"https://{server}/wxapp/getCode",
+            f"http://{server}/wxapp/getCode",
             json={"ref": ref, "app_id": APP_ID},
             timeout=15,
             proxies={"http": None, "https": None},
@@ -250,7 +248,7 @@ def refresh_token(server: str, ref: str) -> str | None:
 
         # 2. 获取手机号数据
         phone_resp = requests.post(
-            f"https://{server}/wxapp/getPhoneNumber",
+            f"http://{server}/wxapp/getPhoneNumber",
             json={"ref": ref, "app_id": APP_ID},
             timeout=15,
             proxies={"http": None, "https": None},

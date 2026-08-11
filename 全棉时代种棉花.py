@@ -118,8 +118,6 @@ if _yyb_auth:
     _orig_requests_post = requests.post
     def _yyb_requests_post(url, *args, **kwargs):
         if isinstance(url, str) and "/wxapp/getCode" in url:
-            if url.startswith("http://"):
-                url = url.replace("http://", "https://", 1)
             kwargs.setdefault("headers", {})
             kwargs["headers"]["Authorization"] = _yyb_auth
         return _orig_requests_post(url, *args, **kwargs)
@@ -896,7 +894,7 @@ def get_wx_code(entry):
         _auth = f"Bearer {_tok}"
     elif _u and _p:
         _auth = "Basic " + _b64.b64encode(f"{_u}:{_p}".encode()).decode()
-    url = f"https://{server}/wxapp/getCode"
+    url = f"http://{server}/wxapp/getCode"
     print(f"[{yyb_display(entry)}] 请求 YYB Go 获取 code: {url}")
     resp = requests.post(
         url,

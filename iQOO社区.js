@@ -117,7 +117,7 @@ const path = require("path");
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/getCode') || url.includes('/wxapp/operateWxData')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = yybAuth;
@@ -347,11 +347,11 @@ class Task {
         const { server, ref } = parseYybGoEntry(this.openid);
         if (!server || !ref) throw new Error("YYB_GO 格式错误: " + this.openid);
         // 1) wx login code（/wxapp/getCode）
-        const { data: cRes } = await axios.post(`https://${server}/wxapp/getCode`, { ref, app_id: MINI_APP_ID }, { timeout: 15000, validateStatus: () => true });
+        const { data: cRes } = await axios.post(`http://${server}/wxapp/getCode`, { ref, app_id: MINI_APP_ID }, { timeout: 15000, validateStatus: () => true });
         const code = cRes && (cRes.code || (cRes.data && cRes.data.code));
         if (!code) throw new Error(`YYB Go 获取 code 失败: ${JSON.stringify(cRes)}`);
         // 2) encryptedData / iv（/wxapp/operateWxData → getUserInfo）
-        const { data: uRes } = await axios.post(`https://${server}/wxapp/operateWxData`, {
+        const { data: uRes } = await axios.post(`http://${server}/wxapp/operateWxData`, {
             ref, app_id: MINI_APP_ID,
             payload: { api_name: "getUserInfo", data: {}, env: 1 },
         }, { timeout: 45000, validateStatus: () => true });

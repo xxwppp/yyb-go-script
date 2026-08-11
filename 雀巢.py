@@ -303,7 +303,7 @@ async def get_code_via_yyb(server_entry: str, appid: str) -> Optional[str]:
         print(f"❌ [{display}] 获取code失败 | 缺少openid/ref")
         return None
 
-    url = f"https://{server}/wxapp/getCode"
+    url = f"http://{server}/wxapp/getCode"
     auth = build_yyb_auth_header()
     req_headers = {"Content-Type": "application/json"}
     if auth:

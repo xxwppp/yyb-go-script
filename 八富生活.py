@@ -24,6 +24,26 @@ import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# === YYB 协议统一认证（自动注入 Authorization 到 /wxapp/getCode 与 /wxapp/getPhoneNumber） begin ===
+import base64 as _b64
+_yyb_token = os.environ.get("YYB_TOKEN", "")
+_yyb_user = os.environ.get("YYB_USER", "")
+_yyb_pass = os.environ.get("YYB_PASS", "")
+_yyb_auth = None
+if _yyb_token:
+    _yyb_auth = f"Bearer {_yyb_token}"
+elif _yyb_user and _yyb_pass:
+    _yyb_auth = "Basic " + _b64.b64encode(f"{_yyb_user}:{_yyb_pass}".encode()).decode()
+if _yyb_auth:
+    _orig_requests_post = requests.post
+    def _yyb_requests_post(url, *args, **kwargs):
+        if isinstance(url, str) and ("/wxapp/getCode" in url or "/wxapp/getPhoneNumber" in url):
+            kwargs.setdefault("headers", {})
+            kwargs["headers"]["Authorization"] = _yyb_auth
+        return _orig_requests_post(url, *args, **kwargs)
+    requests.post = _yyb_requests_post
+# === YYB 协议统一认证 end ===
+
 # ---------- SSL 补丁 ----------
 _ORIG_REQUEST = requests.Session.request
 
@@ -170,7 +190,7 @@ def parse_yyb_go_env(line: str = None):
 def get_yyb_wechat_code(ref, host_port, appid=APPID):
     """
     通过 YYB GO 获取微信登录 code
-    POST /wxapp/getCode
+    兼容新版 POST 与旧版 GET（旧版 wxapp 接口只接受 GET，参数走 query string）
     """
     if not host_port:
         log("  ❌ host_port 为空")
@@ -180,18 +200,18 @@ def get_yyb_wechat_code(ref, host_port, appid=APPID):
         host_port = "http://" + host_port
 
     url = f"{host_port}/wxapp/getCode"
+    headers = {"Authorization": _yyb_auth} if _yyb_auth else {}
+    params = {"ref": ref, "app_id": appid}
 
     try:
-        resp = requests.post(
-            url,
-            json={"ref": ref, "app_id": appid},
-            timeout=10
-        )
+        resp = requests.post(url, json=params, headers=headers, timeout=10)
+        if resp.status_code == 405:
+            resp = requests.get(url, params=params, headers=headers, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
-            inner_data = data.get("data", {})
-            result = inner_data.get("result", {})
-            code = result.get("code")
+            inner_data = data.get("data", {}) or {}
+            result = inner_data.get("result", {}) if isinstance(inner_data.get("result"), dict) else {}
+            code = result.get("code") or inner_data.get("code")
             if code:
                 return code
             log(f"  ⚠️ YYB GO 返回 code 为空: {data}")
@@ -205,6 +225,7 @@ def get_yyb_wechat_code(ref, host_port, appid=APPID):
 def get_yyb_phone_code(ref, host_port, appid=APPID):
     """
     通过 YYB GO 获取手机号授权 code
+    兼容新版 POST 与旧版 GET（旧版 wxapp 接口只接受 GET，参数走 query string）
     """
     if not host_port:
         return None
@@ -213,18 +234,18 @@ def get_yyb_phone_code(ref, host_port, appid=APPID):
         host_port = "http://" + host_port
 
     url = f"{host_port}/wxapp/getPhoneNumber"
+    headers = {"Authorization": _yyb_auth} if _yyb_auth else {}
+    params = {"ref": ref, "app_id": appid}
 
     try:
-        resp = requests.post(
-            url,
-            json={"ref": ref, "app_id": appid},
-            timeout=10
-        )
+        resp = requests.post(url, json=params, headers=headers, timeout=10)
+        if resp.status_code == 405:
+            resp = requests.get(url, params=params, headers=headers, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
-            inner_data = data.get("data", {})
-            result = inner_data.get("result", {})
-            code = result.get("code")
+            inner_data = data.get("data", {}) or {}
+            result = inner_data.get("result", {}) if isinstance(inner_data.get("result"), dict) else {}
+            code = result.get("code") or inner_data.get("code")
             if code:
                 return code
             log(f"  ⚠️ YYB GO 返回 phone code 为空: {data}")

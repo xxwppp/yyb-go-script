@@ -65,8 +65,6 @@ if _yyb_auth:
     _orig_requests_post = requests.post
     def _yyb_requests_post(url, *args, **kwargs):
         if isinstance(url, str) and "/wxapp/" in url:
-            if url.startswith("http://"):
-                url = url.replace("http://", "https://", 1)
             kwargs.setdefault("headers", {})
             kwargs["headers"]["Authorization"] = _yyb_auth
         return _orig_requests_post(url, *args, **kwargs)
@@ -164,7 +162,7 @@ def get_wx_login_code(server_entry: str) -> str | None:
     parsed_server, ref = parse_yyb_go_entry(server_entry)
     if not parsed_server or not ref:
         return None
-    url = f"https://{parsed_server}/wxapp/getCode"
+    url = f"http://{parsed_server}/wxapp/getCode"
     try:
         resp = requests.post(url, json={"ref": ref, "app_id": APPID}, timeout=20,
                              proxies={"http": None, "https": None})
@@ -185,7 +183,7 @@ def get_wx_phone_code(server_entry: str) -> str | None:
     parsed_server, ref = parse_yyb_go_entry(server_entry)
     if not parsed_server or not ref:
         return None
-    url = f"https://{parsed_server}/wxapp/getPhoneNumber"
+    url = f"http://{parsed_server}/wxapp/getPhoneNumber"
     try:
         resp = requests.post(url, json={"ref": ref, "app_id": APPID}, timeout=20,
                              proxies={"http": None, "https": None})

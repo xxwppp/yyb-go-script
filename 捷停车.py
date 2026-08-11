@@ -269,7 +269,7 @@ async def get_code_via_yyb(server_entry: str, appid: str) -> Optional[str]:
         print(f"❌ [{yyb_display(server_entry)}] 获取code失败 | 缺少openid/ref")
         return None
 
-    url = f"https://{server}/wxapp/getCode"
+    url = f"http://{server}/wxapp/getCode"
     try:
         async with httpx.AsyncClient(timeout=20.0, verify=False, trust_env=False) as client:
             response = await client.post(url, json={"ref": ref, "app_id": appid})

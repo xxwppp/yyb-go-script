@@ -100,7 +100,7 @@ const path = require("path");
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/getCode')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = yybAuth;
@@ -251,9 +251,9 @@ function parseYybGoEntry(rawValue) {
 async function getWxCode(entry) {
   const { server, ref } = parseYybGoEntry(entry);
   if (!server || !ref) throw new Error("YYB_GO 格式错误: " + entry);
-  console.log(`[${yybDisplay(entry)}] 请求 YYB Go 获取 code: https://${server}/wxapp/getCode`);
+  console.log(`[${yybDisplay(entry)}] 请求 YYB Go 获取 code: http://${server}/wxapp/getCode`);
   const res = await axios.post(
-    `https://${server}/wxapp/getCode`,
+    `http://${server}/wxapp/getCode`,
     { ref, app_id: MINI_APPID },
     { timeout: 20000, proxy: false, validateStatus: () => true }
   );

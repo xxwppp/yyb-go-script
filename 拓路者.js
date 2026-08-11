@@ -95,7 +95,7 @@ const path = require("path");
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/getCode')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = yybAuth;
@@ -160,7 +160,7 @@ const wechat = {
   appid: MINI_APP_ID,
   async getCode(entry) {
     const { server, openid } = parseYybGoEntry(entry);
-    const { data } = await axios.post(`https://${server}/wxapp/getCode`, { ref: openid, app_id: MINI_APP_ID }, { timeout: 15000, validateStatus: () => true });
+    const { data } = await axios.post(`http://${server}/wxapp/getCode`, { ref: openid, app_id: MINI_APP_ID }, { timeout: 15000, validateStatus: () => true });
     const code = data && (data.code || (data.data && data.data.code));
     if (!code) throw new Error('YYB_GO 获取 code 失败: ' + JSON.stringify(data));
     return { data: { status: true, code: code, data: { code: code } } };
