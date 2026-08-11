@@ -242,7 +242,8 @@ UCMP_BASE = "https://ucmp.sf-express.com"
 
 class AutoCookieManager:
     def __init__(self, wx_server: str = None):
-        self.wx_server = (wx_server or SF_WX_SERVER).strip().rstrip("/")
+        _wx = (wx_server or SF_WX_SERVER).strip().rstrip("/")
+        self.wx_server = _wx if not _wx or _wx.startswith(("http://", "https://")) else f"http://{_wx}"
         self.session = requests.Session()
         self.session.verify = False
     

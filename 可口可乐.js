@@ -96,7 +96,7 @@ const axios = require("axios");
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/getCode')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = yybAuth;
@@ -417,7 +417,7 @@ async function getCode(server) {
     const { server: parsedServer, ref } = parseYybGoEntry(server);
     if (!parsedServer || !ref) return null;
 
-    const url = `https://${parsedServer}/wxapp/getCode`;
+    const url = `http://${parsedServer}/wxapp/getCode`;
 
     try {
         const { data } = await axios.post(url, {

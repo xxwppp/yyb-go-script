@@ -97,7 +97,7 @@ const axios = require("axios");
     axios.interceptors.request.use(config => {
         let url = config.url || '';
         if (url.includes('/wxapp/getCode')) {
-            if (url.startsWith('http://')) config.url = url.replace('http://', 'https://');
+            if (url.startsWith('http://')) ;
             if (yybAuth) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = yybAuth;
@@ -130,7 +130,7 @@ function parseYybGoEntry(rawValue) {
     }
     let server = value.slice(0, atIndex).trim();
     const ref = value.slice(atIndex + 1).trim();
-    let scheme = "https";
+    let scheme = "http";
     if (server.startsWith("http://")) { scheme = "http"; server = server.slice(7); }
     else if (server.startsWith("https://")) { scheme = "https"; server = server.slice(8); }
     server = server.replace(/\/+$/, "");
