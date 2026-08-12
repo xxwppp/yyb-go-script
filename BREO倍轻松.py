@@ -97,10 +97,10 @@ import sys
 import time
 from pathlib import Path
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(__sys.stdout, "reconfigure"):
+    __sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(__sys.stderr, "reconfigure"):
+    __sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # === YYB 协议统一认证（自动 https + Basic/Bearer） begin ===
 import base64 as _b64
