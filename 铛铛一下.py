@@ -691,7 +691,7 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
     try:
         sign_resp = api_get(server, SIGN_JOIN_URL, token, proxies)
         if sign_resp.get("code") == 0:
-            sign_name = sign_resp.get("data", {}).get("name", "签到成功")
+            sign_name = (sign_resp.get("data") or {}).get("name", "签到成功")
             result["signMsg"] = f"每日签到: {sign_name}"
             print(f"✅ [签到] {result['signMsg']}")
         else:
@@ -699,7 +699,7 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
             print(f"⚠️ [签到] {result['signMsg']}")
 
         lottery_info = api_get(server, LOTTERY_INFO_URL, token, proxies)
-        member_count = int(lottery_info.get("data", {}).get("member_count", 0) or 0)
+        member_count = int((lottery_info.get("data") or {}).get("member_count", 0) or 0)
         print(f"🎰 [抽奖] 当前可抽奖 {member_count} 次")
 
         prize_list: List[str] = []
@@ -732,7 +732,7 @@ def run_account(index: int, total: int, server: str) -> Dict[str, Any]:
         result["lotteryMsg"] = "、".join(prize_list) if prize_list else f"{member_count} 次机会"
 
         account_resp = api_get(server, ACCOUNT_DETAIL_URL, token, proxies)
-        total_raw = account_resp.get("data", {}).get("total", 0)
+        total_raw = (account_resp.get("data") or {}).get("total", 0)
         total = to_float(total_raw)
 
         result["balance"] = str(total_raw)
